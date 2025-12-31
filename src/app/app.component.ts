@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, inject, signal } from '@angular/core';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { NavbarComponent } from './components/navbar/navbar.component';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +12,15 @@ import { NavbarComponent } from './components/navbar/navbar.component';
 })
 export class AppComponent {
   title = 'cabinet-medical-front';
+  
+  private router = inject(Router);
+  showNavbar = signal(true);
+  
+  constructor() {
+    this.router.events
+      .pipe(filter(event => event instanceof NavigationEnd))
+      .subscribe((event: NavigationEnd) => {
+        this.showNavbar.set(!event.urlAfterRedirects.startsWith('/secretary'));
+      });
+  }
 }

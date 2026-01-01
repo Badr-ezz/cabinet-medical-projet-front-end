@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AuthService } from '../../../services/auth.service';
 
 interface MenuItem {
   label: string;
@@ -14,6 +15,8 @@ interface MenuItem {
   templateUrl: './secretary-layout.component.html'
 })
 export class SecretaryLayoutComponent {
+  private authService = inject(AuthService);
+  
   // Signal pour l'état de la sidebar sur mobile
   isSidebarOpen = signal(false);
 
@@ -32,5 +35,9 @@ export class SecretaryLayoutComponent {
 
   closeSidebar() {
     this.isSidebarOpen.set(false);
+  }
+
+  logout() {
+    this.authService.logout();
   }
 }

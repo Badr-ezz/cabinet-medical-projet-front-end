@@ -21,7 +21,11 @@ export class AppComponent {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
         const url = event.urlAfterRedirects;
-        this.showNavbar.set(!url.startsWith('/secretary') && !url.startsWith('/doctor'));
+        this.showNavbar.set(
+          !url.startsWith('/secretary') && 
+          !url.startsWith('/doctor') && 
+          !url.startsWith('/admin')
+        );
       });
   }
 }

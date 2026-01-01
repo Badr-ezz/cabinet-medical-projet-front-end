@@ -17,12 +17,27 @@ import { ConsultationComponent } from './pages/doctor/consultation/consultation.
 import { MedicalRecordComponent } from './pages/doctor/medical-record/medical-record.component';
 import { PrescriptionsComponent } from './pages/doctor/prescriptions/prescriptions.component';
 
+// Admin imports
+import { AdminLayoutComponent } from './pages/admin/layout/admin-layout.component';
+import { AdminDashboardComponent } from './pages/admin/dashboard/dashboard.component';
+import { CabinetsComponent } from './pages/admin/cabinets/cabinets.component';
+import { UsersComponent } from './pages/admin/users/users.component';
+import { MedicationsComponent } from './pages/admin/medications/medications.component';
+import { SettingsComponent } from './pages/admin/settings/settings.component';
+
+// Guard import
+import { authGuard } from './guards/auth.guard';
+
 export const routes: Routes = [
+  // Routes publiques (pas de guard)
   { path: '', component: HomeComponent },
   { path: 'login', component: LoginComponent },
+  
+  // Routes protégées (nécessitent authentification)
   { 
     path: 'secretary', 
     component: SecretaryLayoutComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent },
@@ -35,6 +50,7 @@ export const routes: Routes = [
   { 
     path: 'doctor', 
     component: DoctorLayoutComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DoctorDashboardComponent },
@@ -43,6 +59,19 @@ export const routes: Routes = [
       { path: 'consultation', component: ConsultationComponent },
       { path: 'medical-record', component: MedicalRecordComponent },
       { path: 'prescriptions', component: PrescriptionsComponent }
+    ]
+  },
+  { 
+    path: 'admin', 
+    component: AdminLayoutComponent,
+    canActivate: [authGuard],
+    children: [
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'dashboard', component: AdminDashboardComponent },
+      { path: 'cabinets', component: CabinetsComponent },
+      { path: 'users', component: UsersComponent },
+      { path: 'medications', component: MedicationsComponent },
+      { path: 'settings', component: SettingsComponent }
     ]
   },
   { path: '**', redirectTo: '' }

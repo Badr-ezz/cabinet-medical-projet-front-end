@@ -9,22 +9,22 @@ interface MenuItem {
 }
 
 @Component({
-  selector: 'app-doctor-layout',
+  selector: 'app-admin-layout',
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
-  templateUrl: './doctor-layout.component.html'
+  templateUrl: './admin-layout.component.html'
 })
-export class DoctorLayoutComponent {
+export class AdminLayoutComponent {
   private authService = inject(AuthService);
   
   isSidebarOpen = signal(false);
   
   menuItems = signal<MenuItem[]>([
-    { label: 'Dashboard', icon: 'dashboard', route: '/doctor/dashboard' },
-    { label: 'Patients', icon: 'patients', route: '/doctor/patients' },
-    { label: 'Consultation en cours', icon: 'consultation', route: '/doctor/consultation' },
-    { label: 'Dossier médical', icon: 'medical-record', route: '/doctor/medical-record' },
-    { label: 'Ordonnances', icon: 'prescriptions', route: '/doctor/prescriptions' }
+    { label: 'Dashboard', icon: 'dashboard', route: '/admin/dashboard' },
+    { label: 'Cabinets', icon: 'cabinets', route: '/admin/cabinets' },
+    { label: 'Utilisateurs', icon: 'users', route: '/admin/users' },
+    { label: 'Médicaments', icon: 'medications', route: '/admin/medications' },
+    { label: 'Paramètres', icon: 'settings', route: '/admin/settings' }
   ]);
 
   toggleSidebar() {

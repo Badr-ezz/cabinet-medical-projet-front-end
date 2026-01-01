@@ -1,0 +1,172 @@
+<!-- Header de la page -->
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+  <p class="text-gray-600 mt-1">{{ currentDate() }}</p>
+</div>
+
+<!-- Message de bienvenue -->
+<div class="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 mb-8 text-white">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+    <div>
+      <h2 class="text-2xl font-bold mb-2">Bienvenue, {{ doctorName() }} 👋</h2>
+      <p class="text-green-100">Vous avez 12 consultations prévues aujourd'hui. 3 patients sont en attente.</p>
+    </div>
+    <div class="mt-4 md:mt-0">
+      <button class="inline-flex items-center px-4 py-2 bg-white text-green-700 font-medium rounded-lg hover:bg-green-50 transition-colors duration-200">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Nouvelle consultation
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cartes statistiques -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  @for (stat of stats(); track stat.title) {
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-gray-500 mb-1">{{ stat.title }}</p>
+          <p class="text-3xl font-bold text-gray-900">{{ stat.value }}</p>
+          @if (stat.trend) {
+            <p class="text-xs text-green-600 mt-1">{{ stat.trend }}</p>
+          }
+        </div>
+        <div class="w-12 h-12 rounded-full flex items-center justify-center"
+             [class]="stat.color === 'blue' ? 'bg-blue-100' : 
+                      stat.color === 'green' ? 'bg-green-100' : 
+                      stat.color === 'purple' ? 'bg-purple-100' : 'bg-yellow-100'">
+          @switch (stat.icon) {
+            @case ('consultation') {
+              <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+            }
+            @case ('patients') {
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            }
+            @case ('prescription') {
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            }
+            @case ('clock') {
+              <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Section principale -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <!-- Patients du jour -->
+  <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="p-6 border-b border-gray-100">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Patients du jour</h3>
+        <span class="text-sm text-gray-500">{{ todayPatients().length }} consultations</span>
+      </div>
+    </div>
+    <div class="divide-y divide-gray-100">
+      @for (patient of todayPatients(); track patient.id) {
+        <div class="p-4 hover:bg-gray-50 transition-colors duration-200">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+              <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <span class="text-sm font-medium text-green-700">{{ patient.prenom[0] }}{{ patient.nom[0] }}</span>
+              </div>
+              <div>
+                <p class="font-medium text-gray-900">{{ patient.prenom }} {{ patient.nom }}</p>
+                <p class="text-sm text-gray-500">{{ patient.type }}</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <span class="text-sm font-medium text-gray-900">{{ patient.heure }}</span>
+              <span class="px-2 py-1 text-xs font-medium rounded-full" [class]="getStatusClass(patient.status)">
+                {{ getStatusLabel(patient.status) }}
+              </span>
+              @if (patient.status === 'en-attente') {
+                <button class="text-green-600 hover:text-green-700 text-sm font-medium">
+                  Appeler
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Panneau latéral -->
+  <div class="space-y-6">
+    <!-- Activité récente -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Activité récente</h3>
+      <div class="space-y-4">
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-900">Consultation terminée</p>
+            <p class="text-xs text-gray-500">Fatima El Fassi - il y a 15 min</p>
+          </div>
+        </div>
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-900">Ordonnance générée</p>
+            <p class="text-xs text-gray-500">Ahmed Benali - il y a 45 min</p>
+          </div>
+        </div>
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-900">Nouveau patient</p>
+            <p class="text-xs text-gray-500">Nadia Chraibi - il y a 2h</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphique placeholder -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Consultations cette semaine</h3>
+      <div class="h-40 bg-gray-50 rounded-lg flex items-center justify-center">
+        <div class="text-center">
+          <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+          <p class="text-sm text-gray-400">Graphique des consultations</p>
+        </div>
+      </div>
+      <div class="mt-4 flex justify-between text-sm">
+        <span class="text-gray-500">Lun</span>
+        <span class="text-gray-500">Mar</span>
+        <span class="text-gray-500">Mer</span>
+        <span class="text-gray-500">Jeu</span>
+        <span class="text-gray-500">Ven</span>
+        <span class="text-gray-500">Sam</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -20,7 +20,8 @@ export class AppComponent {
     this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
-        this.showNavbar.set(!event.urlAfterRedirects.startsWith('/secretary'));
+        const url = event.urlAfterRedirects;
+        this.showNavbar.set(!url.startsWith('/secretary') && !url.startsWith('/doctor'));
       });
   }
 }

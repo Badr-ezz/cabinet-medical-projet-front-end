@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { Observable, map, tap } from 'rxjs';
+import { AuthResponse } from '../models/auth-response.model';
 
 /**
  * AuthService - Service d'authentification
@@ -31,17 +32,18 @@ export class AuthService {
    * Authentifie l'utilisateur auprès de l'API
    * @param login - Email ou identifiant de l'utilisateur
    * @param pwd - Mot de passe
-   * @returns Observable<string> - Le token JWT en cas de succès
+   * @returns Observable<AuthResponse> - La réponse d'authentification
    */
-  login(login: string, pwd: string): Observable<string> {
-    return this.http.post(
+  login(login: string, pwd: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(
       `${this.API_URL}/login`,
-      { login, pwd },
-      { responseType: 'text' } // Le backend renvoie le token en texte brut
+      { login, pwd }
     ).pipe(
-      tap(token => {
-        // Stocke le token dans localStorage après un login réussi
-        this.saveToken(token);
+      tap(response => {
+        // Stocke uniquement le token dans localStorage après un login réussi
+        if (response.token && !response.tokenExpired) {
+          this.saveToken(response.token);
+        }
       })
     );
   }

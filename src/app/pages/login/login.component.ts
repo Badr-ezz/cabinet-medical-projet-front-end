@@ -58,17 +58,30 @@ export class LoginComponent {
 
     // Appelle l'API de login
     this.authService.login(this.login(), this.password()).subscribe({
-      next: () => {
+      next: (response) => {
+        // Vérifie si la réponse contient une erreur
+        if (response.error) {
+          this.isLoading.set(false);
+          this.errorMessage.set(response.error);
+          return;
+        }
+        
+        // Vérifie si le token est expiré
+        if (response.tokenExpired) {
+          this.isLoading.set(false);
+          this.errorMessage.set('Session expirée, veuillez vous reconnecter');
+          return;
+        }
+        
         // Login réussi - récupère le rôle et redirige
         const role = this.authService.getUserRole();
         this.redirectBasedOnRole(role);
       },
       error: (error) => {
-        // Gestion des erreurs
+        // Gestion des erreurs HTTP
         this.isLoading.set(false);
 
-        console.log( error);
-        
+        console.log(error);
         
         if (error.status === 401) {
           this.errorMessage.set('Login ou mot de passe incorrect');

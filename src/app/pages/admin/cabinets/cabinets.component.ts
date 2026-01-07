@@ -1,14 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
-interface Cabinet {
-  id: number;
-  nom: string;
-  specialite: string;
-  adresse: string;
-  telephone: string;
-  status: 'active' | 'inactive';
-}
+import { CabinetService } from '../../../services/cabinet.service';
+import { Cabinet, CreateCabinetRequest } from '../../../models/cabinet.model';
 
 @Component({
   selector: 'app-cabinets',
@@ -16,67 +9,226 @@ interface Cabinet {
   imports: [FormsModule],
   templateUrl: './cabinets.component.html'
 })
-export class CabinetsComponent {
+export class CabinetsComponent implements OnInit {
+  private cabinetService = inject(CabinetService);
+  
+  // État de l'interface
   showModal = signal(false);
   editingCabinet = signal<Cabinet | null>(null);
+  isLoading = signal(false);
+  errorMessage = signal('');
+  successMessage = signal('');
 
-  cabinets = signal<Cabinet[]>([
-    { id: 1, nom: 'Cabinet Médical Casablanca', specialite: 'Médecine générale', adresse: '123 Bd Mohammed V, Casablanca', telephone: '0522123456', status: 'active' },
-    { id: 2, nom: 'Cabinet Dentaire Rabat', specialite: 'Dentisterie', adresse: '45 Av Hassan II, Rabat', telephone: '0537234567', status: 'active' },
-    { id: 3, nom: 'Cabinet Pédiatrie Marrakech', specialite: 'Pédiatrie', adresse: '78 Rue Yougoslavie, Marrakech', telephone: '0524345678', status: 'active' },
-    { id: 4, nom: 'Cabinet Médical Fès', specialite: 'Médecine générale', adresse: '12 Bd Allal El Fassi, Fès', telephone: '0535456789', status: 'inactive' },
-    { id: 5, nom: 'Cabinet Cardiologie Tanger', specialite: 'Cardiologie', adresse: '90 Av Mohammed VI, Tanger', telephone: '0539567890', status: 'active' }
-  ]);
+  // Liste des cabinets
+  cabinets = signal<Cabinet[]>([]);
 
-  formData = signal({
+  // Données du formulaire
+  formData = signal<CreateCabinetRequest>({
     nom: '',
+    logo: '',
     specialite: '',
     adresse: '',
-    telephone: ''
+    telephone: '',
+    email: '',
+    actif: true
   });
 
-  openCreateModal() {
+  ngOnInit(): void {
+    this.loadCabinets();
+  }
+
+  /**
+   * Charge tous les cabinets depuis l'API
+   */
+  loadCabinets(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+    
+    this.cabinetService.getAll().subscribe({
+      next: (cabinets) => {
+        this.cabinets.set(cabinets);
+        this.isLoading.set(false);
+
+        console.log(this.cabinets);
+        
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des cabinets:', error);
+        this.errorMessage.set('Impossible de charger les cabinets');
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  /**
+   * Ouvre le modal pour créer un nouveau cabinet
+   */
+  openCreateModal(): void {
     this.editingCabinet.set(null);
-    this.formData.set({ nom: '', specialite: '', adresse: '', telephone: '' });
+    this.formData.set({
+      nom: '',
+      logo: '',
+      specialite: '',
+      adresse: '',
+      telephone: '',
+      email: '',
+      actif: true
+    });
+    this.errorMessage.set('');
     this.showModal.set(true);
   }
 
-  openEditModal(cabinet: Cabinet) {
+  /**
+   * Ouvre le modal pour modifier un cabinet existant
+   */
+  openEditModal(cabinet: Cabinet): void {
     this.editingCabinet.set(cabinet);
     this.formData.set({
       nom: cabinet.nom,
+      logo: cabinet.logo || '',
       specialite: cabinet.specialite,
       adresse: cabinet.adresse,
-      telephone: cabinet.telephone
+      telephone: cabinet.telephone,
+      email: cabinet.email,
+      actif: cabinet.actif
     });
+    this.errorMessage.set('');
     this.showModal.set(true);
   }
 
-  closeModal() {
+  /**
+   * Ferme le modal
+   */
+  closeModal(): void {
     this.showModal.set(false);
     this.editingCabinet.set(null);
+    this.errorMessage.set('');
   }
 
-  updateFormField(field: 'nom' | 'specialite' | 'adresse' | 'telephone', value: string) {
+  /**
+   * Met à jour un champ du formulaire
+   */
+  updateFormField(field: keyof CreateCabinetRequest, value: string | boolean): void {
     this.formData.update(f => ({ ...f, [field]: value }));
   }
 
-  saveCabinet() {
-    console.log('Sauvegarder cabinet:', this.formData());
-    alert(this.editingCabinet() ? 'Cabinet modifié (simulation)' : 'Cabinet créé (simulation)');
-    this.closeModal();
-  }
+  /**
+   * Sauvegarde le cabinet (création ou modification)
+   */
+  saveCabinet(): void {
+    const data = this.formData();
+    
+    // Validation basique
+    if (!data.nom || !data.specialite || !data.adresse || !data.telephone || !data.email) {
+      this.errorMessage.set('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
 
-  deleteCabinet(cabinet: Cabinet) {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer "${cabinet.nom}" ?`)) {
-      console.log('Supprimer cabinet:', cabinet);
-      alert('Cabinet supprimé (simulation)');
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    const editing = this.editingCabinet();
+
+    if (editing) {
+      // Mode modification
+      this.cabinetService.update(editing.id, data).subscribe({
+        next: (updatedCabinet) => {
+          // Met à jour le cabinet dans la liste
+          this.cabinets.update(cabinets => 
+            cabinets.map(c => c.id === updatedCabinet.id ? updatedCabinet : c)
+          );
+          this.isLoading.set(false);
+          this.showSuccess('Cabinet modifié avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la modification:', error);
+          this.errorMessage.set(error.error?.message || 'Erreur lors de la modification du cabinet');
+          this.isLoading.set(false);
+        }
+      });
+    } else {
+      // Mode création
+      this.cabinetService.create(data).subscribe({
+        next: (newCabinet) => {
+          // Ajoute le nouveau cabinet à la liste
+          this.cabinets.update(cabinets => [...cabinets, newCabinet]);
+          this.isLoading.set(false);
+          this.showSuccess('Cabinet créé avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la création:', error);
+          this.errorMessage.set(error.error?.message || 'Erreur lors de la création du cabinet');
+          this.isLoading.set(false);
+        }
+      });
     }
   }
 
-  toggleStatus(cabinet: Cabinet) {
-    const newStatus = cabinet.status === 'active' ? 'inactive' : 'active';
-    console.log('Changer statut:', cabinet.nom, '->', newStatus);
-    alert(`Cabinet ${newStatus === 'active' ? 'activé' : 'désactivé'} (simulation)`);
+  /**
+   * Désactive un cabinet (soft delete)
+   */
+  deleteCabinet(cabinet: Cabinet): void {
+    if (confirm(`Êtes-vous sûr de vouloir désactiver "${cabinet.nom}" ?`)) {
+      this.isLoading.set(true);
+      
+      this.cabinetService.delete(cabinet.id).subscribe({
+        next: () => {
+          // Met à jour le statut dans la liste locale
+          this.cabinets.update(cabinets => 
+            cabinets.map(c => c.id === cabinet.id ? { ...c, actif: false } : c)
+          );
+          this.isLoading.set(false);
+          this.showSuccess('Cabinet désactivé avec succès');
+        },
+        error: (error) => {
+          console.error('Erreur lors de la désactivation:', error);
+          this.errorMessage.set('Erreur lors de la désactivation du cabinet');
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Active/désactive un cabinet
+   */
+  toggleStatus(cabinet: Cabinet): void {
+    const newStatus = !cabinet.actif;
+    const data: CreateCabinetRequest = {
+      nom: cabinet.nom,
+      logo: cabinet.logo || '',
+      specialite: cabinet.specialite,
+      adresse: cabinet.adresse,
+      telephone: cabinet.telephone,
+      email: cabinet.email,
+      actif: newStatus
+    };
+
+    this.isLoading.set(true);
+    
+    this.cabinetService.update(cabinet.id, data).subscribe({
+      next: (updatedCabinet) => {
+        this.cabinets.update(cabinets => 
+          cabinets.map(c => c.id === updatedCabinet.id ? updatedCabinet : c)
+        );
+        this.isLoading.set(false);
+        this.showSuccess(`Cabinet ${newStatus ? 'activé' : 'désactivé'} avec succès`);
+      },
+      error: (error) => {
+        console.error('Erreur lors du changement de statut:', error);
+        this.errorMessage.set('Erreur lors du changement de statut');
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  /**
+   * Affiche un message de succès temporaire
+   */
+  private showSuccess(message: string): void {
+    this.successMessage.set(message);
+    setTimeout(() => this.successMessage.set(''), 3000);
   }
 }

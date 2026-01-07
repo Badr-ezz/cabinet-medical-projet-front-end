@@ -1,20 +1,9 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
-interface User {
-  id: number;
-  nom: string;
-  prenom: string;
-  role: 'Médecin' | 'Secrétaire' | 'Admin';
-  telephone: string;
-  cabinet: string;
-  status: 'active' | 'inactive';
-}
-
-interface Cabinet {
-  id: number;
-  nom: string;
-}
+import { UserService } from '../../../services/user.service';
+import { CabinetService } from '../../../services/cabinet.service';
+import { User, CreateUserRequest, UserRole } from '../../../models/user.model';
+import { Cabinet } from '../../../models/cabinet.model';
 
 @Component({
   selector: 'app-users',
@@ -22,79 +11,278 @@ interface Cabinet {
   imports: [FormsModule],
   templateUrl: './users.component.html'
 })
-export class UsersComponent {
+export class UsersComponent implements OnInit {
+  private userService = inject(UserService);
+  private cabinetService = inject(CabinetService);
+  
+  // État de l'interface
   showModal = signal(false);
-  selectedCabinet = signal('');
+  editingUser = signal<User | null>(null);
+  isLoading = signal(false);
+  errorMessage = signal('');
+  successMessage = signal('');
+  
+  // Filtres de recherche
+  searchTerm = signal('');
+  selectedCabinetId = signal<number | null>(null);
+  
+  // Données
+  cabinets = signal<Cabinet[]>([]);
+  users = signal<User[]>([]);
 
-  cabinets = signal<Cabinet[]>([
-    { id: 1, nom: 'Cabinet Médical Casablanca' },
-    { id: 2, nom: 'Cabinet Dentaire Rabat' },
-    { id: 3, nom: 'Cabinet Pédiatrie Marrakech' },
-    { id: 4, nom: 'Cabinet Médical Fès' },
-    { id: 5, nom: 'Cabinet Cardiologie Tanger' }
-  ]);
+  // Rôles disponibles
+  roles: { value: UserRole; label: string }[] = [
+    { value: 'MEDECIN', label: 'Médecin' },
+    { value: 'SECRETARY', label: 'Secrétaire' },
+    { value: 'ADMIN', label: 'Administrateur' }
+  ];
 
-  users = signal<User[]>([
-    { id: 1, nom: 'Alami', prenom: 'Mohammed', role: 'Médecin', telephone: '0661234567', cabinet: 'Cabinet Médical Casablanca', status: 'active' },
-    { id: 2, nom: 'Bennani', prenom: 'Fatima', role: 'Secrétaire', telephone: '0662345678', cabinet: 'Cabinet Médical Casablanca', status: 'active' },
-    { id: 3, nom: 'Tazi', prenom: 'Karim', role: 'Médecin', telephone: '0663456789', cabinet: 'Cabinet Dentaire Rabat', status: 'active' },
-    { id: 4, nom: 'El Fassi', prenom: 'Sara', role: 'Secrétaire', telephone: '0664567890', cabinet: 'Cabinet Dentaire Rabat', status: 'active' },
-    { id: 5, nom: 'Amrani', prenom: 'Ahmed', role: 'Médecin', telephone: '0665678901', cabinet: 'Cabinet Pédiatrie Marrakech', status: 'active' },
-    { id: 6, nom: 'Chraibi', prenom: 'Nadia', role: 'Admin', telephone: '0666789012', cabinet: 'Cabinet Médical Fès', status: 'inactive' }
-  ]);
-
+  // Filtrage des utilisateurs par recherche et cabinet
   filteredUsers = computed(() => {
-    if (!this.selectedCabinet()) {
-      return this.users();
+    let result = this.users();
+    
+    // Filtre par cabinet
+    const cabinetId = this.selectedCabinetId();
+    if (cabinetId) {
+      result = result.filter(u => u.cabinetId === cabinetId);
     }
-    return this.users().filter(u => u.cabinet === this.selectedCabinet());
+    
+    // Filtre par recherche (login, nom, prenom, numTel, nomCabinet)
+    const search = this.searchTerm().toLowerCase().trim();
+    if (search) {
+      result = result.filter(u => 
+        u.login.toLowerCase().includes(search) ||
+        u.nom.toLowerCase().includes(search) ||
+        u.prenom.toLowerCase().includes(search) ||
+        u.numTel.toLowerCase().includes(search) ||
+        (u.nomCabinet && u.nomCabinet.toLowerCase().includes(search))
+      );
+    }
+    
+    return result;
   });
 
-  formData = signal({
+  // Données du formulaire
+  formData = signal<CreateUserRequest>({
+    cabinetId: 0,
+    login: '',
+    pwd: '',
     nom: '',
     prenom: '',
-    role: '' as 'Médecin' | 'Secrétaire' | 'Admin' | '',
-    telephone: '',
-    cabinet: ''
+    signature: '',
+    numTel: '',
+    role: 'MEDECIN'
   });
 
-  openModal() {
-    this.formData.set({ nom: '', prenom: '', role: '', telephone: '', cabinet: '' });
+  ngOnInit(): void {
+    this.loadCabinets();
+    this.loadUsers();
+  }
+
+  /**
+   * Charge la liste des cabinets actifs
+   */
+  loadCabinets(): void {
+    this.cabinetService.getActive().subscribe({
+      next: (cabinets) => {
+        this.cabinets.set(cabinets);
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des cabinets:', error);
+      }
+    });
+  }
+
+  /**
+   * Charge tous les utilisateurs
+   */
+  loadUsers(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+    
+    this.userService.getAll().subscribe({
+      next: (users) => {
+        this.users.set(users);
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des utilisateurs:', error);
+        this.errorMessage.set('Impossible de charger les utilisateurs');
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  /**
+   * Ouvre le modal pour créer un nouvel utilisateur
+   */
+  openModal(): void {
+    this.editingUser.set(null);
+    this.formData.set({
+      cabinetId: this.cabinets().length > 0 ? this.cabinets()[0].id : 0,
+      login: '',
+      pwd: '',
+      nom: '',
+      prenom: '',
+      signature: '',
+      numTel: '',
+      role: 'MEDECIN'
+    });
+    this.errorMessage.set('');
     this.showModal.set(true);
   }
 
-  closeModal() {
-    this.showModal.set(false);
+  /**
+   * Ouvre le modal pour modifier un utilisateur
+   */
+  openEditModal(user: User): void {
+    this.editingUser.set(user);
+    this.formData.set({
+      id: user.id,
+      cabinetId: user.cabinetId,
+      login: user.login,
+      pwd: '', // Le mot de passe n'est pas pré-rempli pour des raisons de sécurité
+      nom: user.nom,
+      prenom: user.prenom,
+      signature: user.signature || '',
+      numTel: user.numTel,
+      role: user.role
+    });
+    this.errorMessage.set('');
+    this.showModal.set(true);
   }
 
-  updateFormField(field: string, value: string) {
+  /**
+   * Ferme le modal
+   */
+  closeModal(): void {
+    this.showModal.set(false);
+    this.editingUser.set(null);
+    this.errorMessage.set('');
+  }
+
+  /**
+   * Met à jour un champ du formulaire
+   */
+  updateFormField(field: keyof CreateUserRequest, value: string | number): void {
     this.formData.update(f => ({ ...f, [field]: value }));
   }
 
-  saveUser() {
-    console.log('Créer utilisateur:', this.formData());
-    alert('Utilisateur créé (simulation)');
-    this.closeModal();
-  }
+  /**
+   * Sauvegarde l'utilisateur (création ou modification)
+   */
+  saveUser(): void {
+    const data = this.formData();
+    
+    // Validation
+    if (!data.login || !data.nom || !data.prenom || !data.numTel || !data.cabinetId) {
+      this.errorMessage.set('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
 
-  editUser(user: User) {
-    console.log('Modifier utilisateur:', user);
-    alert('Modification utilisateur (simulation)');
-  }
+    // Validation du mot de passe pour la création
+    if (!this.editingUser() && !data.pwd) {
+      this.errorMessage.set('Le mot de passe est obligatoire pour la création');
+      return;
+    }
 
-  deleteUser(user: User) {
-    if (confirm(`Supprimer ${user.prenom} ${user.nom} ?`)) {
-      console.log('Supprimer:', user);
-      alert('Utilisateur supprimé (simulation)');
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    const editing = this.editingUser();
+
+    if (editing) {
+      // Mode modification - si pas de nouveau mot de passe, on garde l'ancien
+      const updateData = { ...data };
+      if (!updateData.pwd) {
+        // On envoie quand même la requête, le backend gère le cas pwd vide
+        updateData.pwd = '';
+      }
+      
+      this.userService.update(updateData).subscribe({
+        next: (updatedUser) => {
+          this.users.update(users => 
+            users.map(u => u.id === updatedUser.id ? updatedUser : u)
+          );
+          this.isLoading.set(false);
+          this.showSuccess('Utilisateur modifié avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la modification:', error);
+          this.errorMessage.set(error.error?.message || 'Erreur lors de la modification');
+          this.isLoading.set(false);
+        }
+      });
+    } else {
+      // Mode création
+      this.userService.create(data).subscribe({
+        next: (newUser) => {
+          this.users.update(users => [...users, newUser]);
+          this.isLoading.set(false);
+          this.showSuccess('Utilisateur créé avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la création:', error);
+          if (error.status === 409) {
+            this.errorMessage.set('Un utilisateur avec ce login existe déjà');
+          } else {
+            this.errorMessage.set(error.error?.message || 'Erreur lors de la création');
+          }
+          this.isLoading.set(false);
+        }
+      });
     }
   }
 
-  getRoleClass(role: string): string {
+  /**
+   * Supprime un utilisateur
+   */
+  deleteUser(user: User): void {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer "${user.prenom} ${user.nom}" ?`)) {
+      this.isLoading.set(true);
+      
+      this.userService.delete(user.id).subscribe({
+        next: () => {
+          this.users.update(users => users.filter(u => u.id !== user.id));
+          this.isLoading.set(false);
+          this.showSuccess('Utilisateur supprimé avec succès');
+        },
+        error: (error) => {
+          console.error('Erreur lors de la suppression:', error);
+          this.errorMessage.set('Erreur lors de la suppression');
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Retourne la classe CSS pour le badge de rôle
+   */
+  getRoleClass(role: UserRole): string {
     switch (role) {
-      case 'Médecin': return 'bg-purple-100 text-purple-700';
-      case 'Secrétaire': return 'bg-blue-100 text-blue-700';
-      case 'Admin': return 'bg-red-100 text-red-700';
+      case 'MEDECIN': return 'bg-purple-100 text-purple-700';
+      case 'SECRETARY': return 'bg-blue-100 text-blue-700';
+      case 'ADMIN': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
+  }
+
+  /**
+   * Retourne le libellé du rôle
+   */
+  getRoleLabel(role: UserRole): string {
+    const found = this.roles.find(r => r.value === role);
+    return found ? found.label : role;
+  }
+
+  /**
+   * Affiche un message de succès temporaire
+   */
+  private showSuccess(message: string): void {
+    this.successMessage.set(message);
+    setTimeout(() => this.successMessage.set(''), 3000);
   }
 }

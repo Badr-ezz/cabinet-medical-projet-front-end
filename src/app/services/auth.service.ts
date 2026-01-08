@@ -122,6 +122,26 @@ export class AuthService {
   }
 
   /**
+   * Récupère l'ID du cabinet depuis le token JWT
+   * @returns L'ID du cabinet ou null
+   */
+  getCabinetId(): number | null {
+    const token = this.getToken();
+    
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.decodeToken(token);
+      return payload?.cabinetId || null;
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error);
+      return null;
+    }
+  }
+
+  /**
    * Décode le payload d'un token JWT sans librairie externe
    * 
    * Étapes :

@@ -1,15 +1,8 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-
-interface Patient {
-  id: number;
-  cin: string;
-  nom: string;
-  prenom: string;
-  telephone: string;
-  dateNaissance: string;
-  email: string;
-}
+import { PatientService } from '../../../services/patient.service';
+import { AuthService } from '../../../services/auth.service';
+import { Patient, PatientRequest } from '../../../models/patient.model';
 
 @Component({
   selector: 'app-patients',
@@ -17,54 +10,247 @@ interface Patient {
   imports: [FormsModule],
   templateUrl: './patients.component.html'
 })
-export class PatientsComponent {
-  // Signal pour la recherche
+export class PatientsComponent implements OnInit {
+  private patientService = inject(PatientService);
+  private authService = inject(AuthService);
+
+  // États de l'interface
+  isModalOpen = signal(false);
+  editingPatient = signal<Patient | null>(null);
+  isLoading = signal(false);
+  errorMessage = signal('');
+  successMessage = signal('');
+
+  // Recherche
   searchTerm = signal('');
   searchType = signal<'cin' | 'nom'>('nom');
 
-  // Signal pour le modal
-  isModalOpen = signal(false);
+  // Données
+  patients = signal<Patient[]>([]);
+  cabinetId = signal<number | null>(null);
 
-  // Données fictives des patients
-  patients = signal<Patient[]>([
-    { id: 1, cin: 'AB123456', nom: 'Benali', prenom: 'Ahmed', telephone: '0661234567', dateNaissance: '1985-03-15', email: 'ahmed.benali@email.com' },
-    { id: 2, cin: 'CD789012', nom: 'Zahrae', prenom: 'Fatima', telephone: '0662345678', dateNaissance: '1990-07-22', email: 'fatima.zahrae@email.com' },
-    { id: 3, cin: 'EF345678', nom: 'Alami', prenom: 'Mohamed', telephone: '0663456789', dateNaissance: '1978-11-08', email: 'mohamed.alami@email.com' },
-    { id: 4, cin: 'GH901234', nom: 'Idrissi', prenom: 'Sara', telephone: '0664567890', dateNaissance: '1995-01-30', email: 'sara.idrissi@email.com' },
-    { id: 5, cin: 'IJ567890', nom: 'Tazi', prenom: 'Youssef', telephone: '0665678901', dateNaissance: '1982-09-12', email: 'youssef.tazi@email.com' },
-    { id: 6, cin: 'KL123789', nom: 'El Fassi', prenom: 'Amina', telephone: '0666789012', dateNaissance: '1988-04-25', email: 'amina.elfassi@email.com' },
-    { id: 7, cin: 'MN456123', nom: 'Bouazza', prenom: 'Karim', telephone: '0667890123', dateNaissance: '1975-12-03', email: 'karim.bouazza@email.com' },
-    { id: 8, cin: 'OP789456', nom: 'Senhaji', prenom: 'Leila', telephone: '0668901234', dateNaissance: '1992-06-18', email: 'leila.senhaji@email.com' }
-  ]);
+  // Types de mutuelle disponibles
+  typesMutuelle = ['CNSS', 'CNOPS', 'RMA', 'SAHAM', 'AXA', 'Autre', 'Aucune'];
+
+  // Sexes disponibles
+  sexes = [
+    { value: 'Masculin', label: 'Masculin' },
+    { value: 'Féminin', label: 'Féminin' }
+  ];
+
+  // Formulaire
+  formData = signal<PatientRequest>({
+    cin: '',
+    nom: '',
+    prenom: '',
+    dateNaissance: '',
+    sexe: '',
+    numTel: '',
+    typeMutuelle: '',
+    cabinetId: 0
+  });
 
   // Computed signal pour filtrer les patients
   filteredPatients = computed(() => {
-    const term = this.searchTerm().toLowerCase();
+    const term = this.searchTerm().toLowerCase().trim();
     if (!term) return this.patients();
 
     return this.patients().filter(patient => {
       if (this.searchType() === 'cin') {
         return patient.cin.toLowerCase().includes(term);
       } else {
-        return patient.nom.toLowerCase().includes(term) || patient.prenom.toLowerCase().includes(term);
+        return patient.nom.toLowerCase().includes(term) || 
+               patient.prenom.toLowerCase().includes(term);
       }
     });
   });
 
-  openModal() {
+  ngOnInit(): void {
+    // Récupère le cabinetId depuis le token
+    const cabId = this.authService.getCabinetId();
+    if (cabId) {
+      this.cabinetId.set(cabId);
+      this.loadPatients();
+    } else {
+      this.errorMessage.set('Impossible de récupérer les informations du cabinet');
+    }
+  }
+
+  /**
+   * Charge les patients du cabinet connecté
+   */
+  loadPatients(): void {
+    const cabId = this.cabinetId();
+    if (!cabId) return;
+
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    this.patientService.getByCabinetId(cabId).subscribe({
+      next: (patients) => {
+        this.patients.set(patients);
+        this.isLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Erreur lors du chargement des patients:', error);
+        this.errorMessage.set('Impossible de charger les patients');
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  /**
+   * Ouvre le modal pour créer un patient
+   */
+  openModal(): void {
+    this.editingPatient.set(null);
+    this.formData.set({
+      cin: '',
+      nom: '',
+      prenom: '',
+      dateNaissance: '',
+      sexe: '',
+      numTel: '',
+      typeMutuelle: '',
+      cabinetId: this.cabinetId() || 0
+    });
+    this.errorMessage.set('');
     this.isModalOpen.set(true);
   }
 
-  closeModal() {
+  /**
+   * Ouvre le modal pour modifier un patient
+   */
+  openEditModal(patient: Patient): void {
+    this.editingPatient.set(patient);
+    this.formData.set({
+      cin: patient.cin,
+      nom: patient.nom,
+      prenom: patient.prenom,
+      dateNaissance: patient.dateNaissance || '',
+      sexe: patient.sexe || '',
+      numTel: patient.numTel || '',
+      typeMutuelle: patient.typeMutuelle || '',
+      cabinetId: patient.cabinetId
+    });
+    this.errorMessage.set('');
+    this.isModalOpen.set(true);
+  }
+
+  /**
+   * Ferme le modal
+   */
+  closeModal(): void {
     this.isModalOpen.set(false);
+    this.editingPatient.set(null);
+    this.errorMessage.set('');
   }
 
-  // Actions fictives
-  editPatient(patient: Patient) {
-    console.log('Modifier patient:', patient);
+  /**
+   * Met à jour un champ du formulaire
+   */
+  updateFormField(field: keyof PatientRequest, value: string | number): void {
+    this.formData.update(f => ({ ...f, [field]: value }));
   }
 
-  deletePatient(patient: Patient) {
-    console.log('Supprimer patient:', patient);
+  /**
+   * Sauvegarde le patient (création ou modification)
+   */
+  savePatient(): void {
+    const data = this.formData();
+
+    // Validation
+    if (!data.cin || !data.nom || !data.prenom) {
+      this.errorMessage.set('Veuillez remplir les champs obligatoires (CIN, Nom, Prénom)');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    const editing = this.editingPatient();
+
+    if (editing) {
+      // Mode modification
+      this.patientService.update(editing.id, data).subscribe({
+        next: (updatedPatient) => {
+          this.patients.update(patients =>
+            patients.map(p => p.id === updatedPatient.id ? updatedPatient : p)
+          );
+          this.isLoading.set(false);
+          this.showSuccess('Patient modifié avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la modification:', error);
+          this.errorMessage.set(error.error?.message || 'Erreur lors de la modification');
+          this.isLoading.set(false);
+        }
+      });
+    } else {
+      // Mode création
+      this.patientService.create(data).subscribe({
+        next: (newPatient) => {
+          this.patients.update(patients => [...patients, newPatient]);
+          this.isLoading.set(false);
+          this.showSuccess('Patient créé avec succès');
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erreur lors de la création:', error);
+          if (error.status === 409) {
+            this.errorMessage.set('Un patient avec ce CIN existe déjà');
+          } else {
+            this.errorMessage.set(error.error?.message || 'Erreur lors de la création');
+          }
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Supprime un patient
+   */
+  deletePatient(patient: Patient): void {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer "${patient.prenom} ${patient.nom}" ?`)) {
+      this.isLoading.set(true);
+
+      this.patientService.delete(patient.id).subscribe({
+        next: () => {
+          this.patients.update(patients => patients.filter(p => p.id !== patient.id));
+          this.isLoading.set(false);
+          this.showSuccess('Patient supprimé avec succès');
+        },
+        error: (error) => {
+          console.error('Erreur lors de la suppression:', error);
+          this.errorMessage.set('Erreur lors de la suppression');
+          this.isLoading.set(false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Calcule l'âge à partir de la date de naissance
+   */
+  calculateAge(dateNaissance: string | undefined): string {
+    if (!dateNaissance) return '-';
+    const today = new Date();
+    const birthDate = new Date(dateNaissance);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return `${age} ans`;
+  }
+
+  /**
+   * Affiche un message de succès temporaire
+   */
+  private showSuccess(message: string): void {
+    this.successMessage.set(message);
+    setTimeout(() => this.successMessage.set(''), 3000);
   }
 }

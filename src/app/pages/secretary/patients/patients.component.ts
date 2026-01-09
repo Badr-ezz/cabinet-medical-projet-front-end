@@ -1,5 +1,6 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { PatientService } from '../../../services/patient.service';
 import { AuthService } from '../../../services/auth.service';
 import { Patient, PatientRequest } from '../../../models/patient.model';
@@ -13,6 +14,7 @@ import { Patient, PatientRequest } from '../../../models/patient.model';
 export class PatientsComponent implements OnInit {
   private patientService = inject(PatientService);
   private authService = inject(AuthService);
+  private router = inject(Router);
 
   // États de l'interface
   isModalOpen = signal(false);
@@ -34,8 +36,8 @@ export class PatientsComponent implements OnInit {
 
   // Sexes disponibles
   sexes = [
-    { value: 'Masculin', label: 'Masculin' },
-    { value: 'Féminin', label: 'Féminin' }
+    { value: 'M', label: 'Masculin' },
+    { value: 'F', label: 'Féminin' }
   ];
 
   // Formulaire
@@ -244,6 +246,17 @@ export class PatientsComponent implements OnInit {
       age--;
     }
     return `${age} ans`;
+  }
+
+  /**
+   * Navigue vers l'agenda pour prendre un RDV pour ce patient
+   */
+  takeAppointment(patient: Patient): void {
+    this.router.navigate(['/secretary/appointments'], {
+      queryParams: {
+        patientId: patient.id
+      }
+    });
   }
 
   /**

@@ -146,7 +146,17 @@
                 }
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center">
-                <div class="flex items-center justify-center space-x-2">
+                <div class="flex items-center justify-center space-x-1">
+                  <!-- Bouton Prendre RDV -->
+                  <button 
+                    (click)="takeAppointment(patient)"
+                    class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors duration-200"
+                    title="Prendre un rendez-vous">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                  <!-- Bouton Modifier -->
                   <button 
                     (click)="openEditModal(patient)"
                     class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
@@ -155,6 +165,7 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                     </svg>
                   </button>
+                  <!-- Bouton Supprimer -->
                   <button 
                     (click)="deletePatient(patient)"
                     class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"

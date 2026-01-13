@@ -1,8 +1,11 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { AppointmentService } from '../../../services/appointment.service';
-import { Appointment, TimeSlot, PatientForAppointment } from '../../../models/appointment.model';
+import { PatientService } from '../../../services/patient.service';
+import { AuthService } from '../../../services/auth.service';
+import { RendezVousResponse, RendezVousRequest, TimeSlot, PatientForAppointment, StatutRDV } from '../../../models/appointment.model';
+import { Patient } from '../../../models/patient.model';
 
 /**
  * AppointmentsComponent - Vue Agenda Journalier
@@ -15,6 +18,7 @@ import { Appointment, TimeSlot, PatientForAppointment } from '../../../models/ap
  * - Sélecteur de date
  * - Modal pour créer un RDV
  * - Modal pour modifier/annuler un RDV
+ * - Intégration avec l'API rendezvous-service (port 8083)
  */
 @Component({
   selector: 'app-appointments',
@@ -24,7 +28,12 @@ import { Appointment, TimeSlot, PatientForAppointment } from '../../../models/ap
 })
 export class AppointmentsComponent implements OnInit {
   private appointmentService = inject(AppointmentService);
+  private patientService = inject(PatientService);
+  private authService = inject(AuthService);
   private route = inject(ActivatedRoute);
+
+  // ID du cabinet (extrait du token JWT)
+  cabinetId = signal<number>(0);
 
   // Date sélectionnée (par défaut: aujourd'hui)
   selectedDate = signal(this.appointmentService.getTodayDate());
@@ -33,6 +42,10 @@ export class AppointmentsComponent implements OnInit {
   isCreateModalOpen = signal(false);
   isEditModalOpen = signal(false);
 
+  // Loading states
+  isLoading = signal(false);
+  isSubmitting = signal(false);
+
   // Patient pré-sélectionné (depuis la page patients)
   preselectedPatient = signal<PatientForAppointment | null>(null);
 
@@ -40,32 +53,36 @@ export class AppointmentsComponent implements OnInit {
   selectedSlot = signal<TimeSlot | null>(null);
 
   // RDV sélectionné pour modification
-  selectedAppointment = signal<Appointment | null>(null);
+  selectedAppointment = signal<RendezVousResponse | null>(null);
+
+  // Rendez-vous du jour (depuis l'API)
+  appointments = signal<RendezVousResponse[]>([]);
+
+  // Patients du cabinet (depuis l'API)
+  patients = signal<PatientForAppointment[]>([]);
 
   // Formulaire création
   createForm = signal({
     patientId: 0,
-    motif: ''
+    motif: '',
+    notes: ''
   });
 
   // Formulaire modification
   editForm = signal({
     heure: '',
     motif: '',
-    status: '' as 'confirmed' | 'pending' | 'cancelled'
+    notes: '',
+    statut: 'EN_ATTENTE' as StatutRDV
   });
 
   // Messages
   successMessage = signal('');
+  errorMessage = signal('');
 
-  // Créneaux horaires pour la date sélectionnée
+  // Créneaux horaires calculés à partir des RDV
   timeSlots = computed(() => {
-    return this.appointmentService.getTimeSlotsForDate(this.selectedDate());
-  });
-
-  // Liste des patients (mock)
-  patients = computed(() => {
-    return this.appointmentService.getPatients();
+    return this.appointmentService.generateTimeSlots(this.appointments());
   });
 
   // Statistiques du jour
@@ -77,17 +94,96 @@ export class AppointmentsComponent implements OnInit {
     return { total, occupied, free };
   });
 
+  constructor() {
+    // Effet pour recharger les RDV quand la date change
+    effect(() => {
+      const date = this.selectedDate();
+      const cabinet = this.cabinetId();
+      if (cabinet > 0) {
+        this.loadAppointments();
+      }
+    }, { allowSignalWrites: true });
+  }
+
   ngOnInit(): void {
+    // Récupère l'ID du cabinet depuis le token
+    const cabinetId = this.authService.getCabinetId();
+    if (cabinetId) {
+      this.cabinetId.set(cabinetId);
+    }
+
+    // Charge les patients du cabinet
+    this.loadPatients();
+
     // Vérifie si un patient est pré-sélectionné via les query params
     this.route.queryParams.subscribe(params => {
       if (params['patientId']) {
-        const patient = this.patients().find(p => p.id === +params['patientId']);
+        const patientId = +params['patientId'];
+        // On cherche le patient une fois la liste chargée
+        const patient = this.patients().find(p => p.id === patientId);
         if (patient) {
           this.preselectedPatient.set(patient);
+        } else {
+          // Si pas encore chargé, on attend
+          this.patientService.getById(patientId).subscribe({
+            next: (p) => {
+              this.preselectedPatient.set({
+                id: p.id,
+                nom: p.nom,
+                prenom: p.prenom,
+                cin: p.cin
+              });
+            }
+          });
         }
       }
       if (params['date']) {
         this.selectedDate.set(params['date']);
+      }
+    });
+  }
+
+  /**
+   * Charge les patients du cabinet
+   */
+  private loadPatients(): void {
+    const cabinetId = this.authService.getCabinetId();
+    if (!cabinetId) return;
+
+    this.patientService.getByCabinetId(cabinetId).subscribe({
+      next: (patients) => {
+        this.patients.set(patients.map(p => ({
+          id: p.id,
+          nom: p.nom,
+          prenom: p.prenom,
+          cin: p.cin
+        })));
+      },
+      error: (err) => {
+        console.error('Erreur chargement patients:', err);
+      }
+    });
+  }
+
+  /**
+   * Charge les rendez-vous pour la date sélectionnée
+   */
+  loadAppointments(): void {
+    const cabinetId = this.cabinetId();
+    const date = this.selectedDate();
+    
+    if (!cabinetId) return;
+
+    this.isLoading.set(true);
+    this.appointmentService.getByCabinetAndDate(cabinetId, date).subscribe({
+      next: (appointments) => {
+        this.appointments.set(appointments);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Erreur chargement RDV:', err);
+        this.showError('Erreur lors du chargement des rendez-vous');
+        this.isLoading.set(false);
       }
     });
   }
@@ -136,7 +232,8 @@ export class AppointmentsComponent implements OnInit {
     const preselected = this.preselectedPatient();
     this.createForm.set({
       patientId: preselected ? preselected.id : 0,
-      motif: ''
+      motif: '',
+      notes: ''
     });
     
     this.isCreateModalOpen.set(true);
@@ -151,40 +248,54 @@ export class AppointmentsComponent implements OnInit {
   }
 
   /**
-   * Crée un nouveau rendez-vous
+   * Crée un nouveau rendez-vous via l'API
    */
   createAppointment(): void {
     const slot = this.selectedSlot();
     const form = this.createForm();
     
-    if (!slot || !form.patientId || !form.motif) return;
-    
-    const patient = this.patients().find(p => p.id === form.patientId);
-    if (!patient) return;
+    if (!slot || !form.patientId || !form.motif) {
+      this.showError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
 
-    this.appointmentService.createAppointment(
-      patient,
-      this.selectedDate(),
-      slot.heure,
-      form.motif
-    );
+    const request: RendezVousRequest = {
+      dateRdv: this.selectedDate(),
+      heureRdv: this.appointmentService.formatHeureForApi(slot.heure),
+      motif: form.motif,
+      statut: 'EN_ATTENTE',
+      notes: form.notes || undefined,
+      patientId: form.patientId,
+      cabinetId: this.cabinetId()
+    };
 
-    this.showSuccess('Rendez-vous créé avec succès');
-    this.closeCreateModal();
-    
-    // Réinitialise le patient pré-sélectionné après création
-    this.preselectedPatient.set(null);
+    this.isSubmitting.set(true);
+    this.appointmentService.create(request).subscribe({
+      next: () => {
+        this.showSuccess('Rendez-vous créé avec succès');
+        this.closeCreateModal();
+        this.loadAppointments(); // Recharge la liste
+        this.preselectedPatient.set(null);
+        this.isSubmitting.set(false);
+      },
+      error: (err) => {
+        console.error('Erreur création RDV:', err);
+        this.showError('Erreur lors de la création du rendez-vous');
+        this.isSubmitting.set(false);
+      }
+    });
   }
 
   /**
    * Ouvre le modal de modification pour un RDV existant
    */
-  openEditModal(appointment: Appointment): void {
+  openEditModal(appointment: RendezVousResponse): void {
     this.selectedAppointment.set(appointment);
     this.editForm.set({
-      heure: appointment.heure,
+      heure: this.appointmentService.formatHeureForSlot(appointment.heureRdv),
       motif: appointment.motif,
-      status: appointment.status
+      notes: appointment.notes || '',
+      statut: appointment.statut
     });
     this.isEditModalOpen.set(true);
   }
@@ -198,7 +309,7 @@ export class AppointmentsComponent implements OnInit {
   }
 
   /**
-   * Met à jour un rendez-vous
+   * Met à jour un rendez-vous via l'API
    */
   updateAppointment(): void {
     const apt = this.selectedAppointment();
@@ -207,34 +318,90 @@ export class AppointmentsComponent implements OnInit {
     if (!apt) return;
 
     // Vérifie si le nouveau créneau est disponible
-    if (form.heure !== apt.heure) {
-      if (!this.appointmentService.isSlotAvailable(this.selectedDate(), form.heure, apt.id)) {
-        alert('Ce créneau est déjà occupé');
+    if (form.heure !== this.appointmentService.formatHeureForSlot(apt.heureRdv)) {
+      if (!this.appointmentService.isSlotAvailable(this.appointments(), form.heure, apt.idRendezVous)) {
+        this.showError('Ce créneau est déjà occupé');
         return;
       }
     }
 
-    this.appointmentService.updateAppointment(apt.id, {
-      heure: form.heure,
+    const request: RendezVousRequest = {
+      dateRdv: apt.dateRdv,
+      heureRdv: this.appointmentService.formatHeureForApi(form.heure),
       motif: form.motif,
-      status: form.status
-    });
+      statut: form.statut,
+      notes: form.notes || undefined,
+      patientId: apt.patientId,
+      medecinId: apt.medecinId,
+      cabinetId: apt.cabinetId
+    };
 
-    this.showSuccess('Rendez-vous modifié avec succès');
-    this.closeEditModal();
+    this.isSubmitting.set(true);
+    this.appointmentService.update(apt.idRendezVous, request).subscribe({
+      next: () => {
+        this.showSuccess('Rendez-vous modifié avec succès');
+        this.closeEditModal();
+        this.loadAppointments();
+        this.isSubmitting.set(false);
+      },
+      error: (err) => {
+        console.error('Erreur modification RDV:', err);
+        this.showError('Erreur lors de la modification du rendez-vous');
+        this.isSubmitting.set(false);
+      }
+    });
   }
 
   /**
-   * Annule un rendez-vous
+   * Annule un rendez-vous via l'API
    */
   cancelAppointment(): void {
     const apt = this.selectedAppointment();
     if (!apt) return;
 
-    if (confirm(`Êtes-vous sûr de vouloir annuler le rendez-vous de ${apt.patientPrenom} ${apt.patientNom} ?`)) {
-      this.appointmentService.cancelAppointment(apt.id);
-      this.showSuccess('Rendez-vous annulé');
-      this.closeEditModal();
+    const patient = this.patients().find(p => p.id === apt.patientId);
+    const patientName = patient ? `${patient.prenom} ${patient.nom}` : `Patient #${apt.patientId}`;
+
+    if (confirm(`Êtes-vous sûr de vouloir annuler le rendez-vous de ${patientName} ?`)) {
+      this.isSubmitting.set(true);
+      this.appointmentService.cancel(apt.idRendezVous).subscribe({
+        next: () => {
+          this.showSuccess('Rendez-vous annulé');
+          this.closeEditModal();
+          this.loadAppointments();
+          this.isSubmitting.set(false);
+        },
+        error: (err) => {
+          console.error('Erreur annulation RDV:', err);
+          this.showError('Erreur lors de l\'annulation du rendez-vous');
+          this.isSubmitting.set(false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Supprime définitivement un rendez-vous (ADMIN uniquement)
+   */
+  deleteAppointment(): void {
+    const apt = this.selectedAppointment();
+    if (!apt) return;
+
+    if (confirm('Êtes-vous sûr de vouloir supprimer définitivement ce rendez-vous ?')) {
+      this.isSubmitting.set(true);
+      this.appointmentService.delete(apt.idRendezVous).subscribe({
+        next: () => {
+          this.showSuccess('Rendez-vous supprimé');
+          this.closeEditModal();
+          this.loadAppointments();
+          this.isSubmitting.set(false);
+        },
+        error: (err) => {
+          console.error('Erreur suppression RDV:', err);
+          this.showError('Erreur lors de la suppression du rendez-vous');
+          this.isSubmitting.set(false);
+        }
+      });
     }
   }
 
@@ -246,8 +413,16 @@ export class AppointmentsComponent implements OnInit {
     const slots = this.timeSlots();
     
     return slots
-      .filter(s => s.isFree || (apt && s.appointment?.id === apt.id))
+      .filter(s => s.isFree || (apt && s.appointment?.idRendezVous === apt.idRendezVous))
       .map(s => s.heure);
+  }
+
+  /**
+   * Récupère le nom du patient pour un RDV
+   */
+  getPatientName(patientId: number): string {
+    const patient = this.patients().find(p => p.id === patientId);
+    return patient ? `${patient.prenom} ${patient.nom}` : `Patient #${patientId}`;
   }
 
   /**
@@ -260,25 +435,15 @@ export class AppointmentsComponent implements OnInit {
   /**
    * Retourne la classe CSS pour le statut
    */
-  getStatusClass(status: string): string {
-    switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  getStatusClass(statut: string): string {
+    return this.appointmentService.getStatutClass(statut);
   }
 
   /**
    * Retourne le libellé du statut
    */
-  getStatusLabel(status: string): string {
-    switch (status) {
-      case 'confirmed': return 'Confirmé';
-      case 'pending': return 'En attente';
-      case 'cancelled': return 'Annulé';
-      default: return status;
-    }
+  getStatusLabel(statut: string): string {
+    return this.appointmentService.getStatutLabel(statut);
   }
 
   /**
@@ -286,10 +451,20 @@ export class AppointmentsComponent implements OnInit {
    */
   private showSuccess(message: string): void {
     this.successMessage.set(message);
+    this.errorMessage.set('');
     setTimeout(() => this.successMessage.set(''), 3000);
   }
 
-  // ===== Méthodes pour mettre à jour les formulaires (évite les arrow functions dans le template) =====
+  /**
+   * Affiche un message d'erreur temporaire
+   */
+  private showError(message: string): void {
+    this.errorMessage.set(message);
+    this.successMessage.set('');
+    setTimeout(() => this.errorMessage.set(''), 5000);
+  }
+
+  // ===== Méthodes pour mettre à jour les formulaires =====
 
   updateCreatePatientId(patientId: string): void {
     this.createForm.update(f => ({ ...f, patientId: +patientId }));
@@ -297,6 +472,10 @@ export class AppointmentsComponent implements OnInit {
 
   updateCreateMotif(motif: string): void {
     this.createForm.update(f => ({ ...f, motif }));
+  }
+
+  updateCreateNotes(notes: string): void {
+    this.createForm.update(f => ({ ...f, notes }));
   }
 
   updateEditHeure(heure: string): void {
@@ -307,7 +486,11 @@ export class AppointmentsComponent implements OnInit {
     this.editForm.update(f => ({ ...f, motif }));
   }
 
-  updateEditStatus(status: string): void {
-    this.editForm.update(f => ({ ...f, status: status as 'confirmed' | 'pending' | 'cancelled' }));
+  updateEditNotes(notes: string): void {
+    this.editForm.update(f => ({ ...f, notes }));
+  }
+
+  updateEditStatut(statut: string): void {
+    this.editForm.update(f => ({ ...f, statut: statut as StatutRDV }));
   }
 }

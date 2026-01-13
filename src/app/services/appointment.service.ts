@@ -1,146 +1,201 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { Appointment, TimeSlot, PatientForAppointment } from '../models/appointment.model';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, map, tap } from 'rxjs';
+import { RendezVousRequest, RendezVousResponse, TimeSlot, PatientForAppointment } from '../models/appointment.model';
+import { AuthService } from './auth.service';
+import { PatientService } from './patient.service';
 
 /**
- * AppointmentService - Service Mock pour la gestion des rendez-vous
+ * AppointmentService - Service pour la gestion des rendez-vous
  * 
- * Ce service gère les rendez-vous uniquement en mémoire (frontend).
- * Aucune API backend n'est appelée.
+ * Communique avec le backend rendezvous-service sur le port 8083
  * 
- * Fonctionnalités :
- * - Génération des créneaux horaires
- * - Gestion des rendez-vous (CRUD)
- * - Vérification des disponibilités
+ * Endpoints disponibles :
+ * - POST   /api/rendezvous                    → Créer un RDV
+ * - GET    /api/rendezvous/cabinet/{id}       → Liste les RDV d'un cabinet
+ * - GET    /api/rendezvous/by-date            → RDV par date
+ * - PUT    /api/rendezvous/{id}               → Modifier un RDV
+ * - PATCH  /api/rendezvous/{id}/annuler       → Annuler un RDV
+ * - DELETE /api/rendezvous/{id}               → Supprimer un RDV
  */
 @Injectable({
   providedIn: 'root'
 })
 export class AppointmentService {
 
-  // Configuration du cabinet (mock)
+  private readonly API_URL = 'http://localhost:8083/api/rendezvous';
+
+  // Configuration des créneaux horaires
   private readonly HEURE_DEBUT = 9;   // 09:00
   private readonly HEURE_FIN = 17;    // 17:00
   private readonly DUREE_CRENEAU = 30; // 30 minutes
 
-  // Patients mock (synchronisé avec les données patients)
-  private mockPatients = signal<PatientForAppointment[]>([
-    { id: 1, nom: 'Benali', prenom: 'Ahmed', cin: 'AB123456' },
-    { id: 2, nom: 'Zahrae', prenom: 'Fatima', cin: 'CD789012' },
-    { id: 3, nom: 'Alami', prenom: 'Mohamed', cin: 'EF345678' },
-    { id: 4, nom: 'Idrissi', prenom: 'Sara', cin: 'GH901234' },
-    { id: 5, nom: 'Tazi', prenom: 'Youssef', cin: 'IJ567890' },
-    { id: 6, nom: 'El Fassi', prenom: 'Amina', cin: 'KL123789' },
-    { id: 7, nom: 'Bouazza', prenom: 'Karim', cin: 'MN456123' },
-    { id: 8, nom: 'Senhaji', prenom: 'Leila', cin: 'OP789456' }
-  ]);
+  private http = inject(HttpClient);
+  private authService = inject(AuthService);
+  private patientService = inject(PatientService);
 
-  // Rendez-vous stockés en mémoire
-  private appointments = signal<Appointment[]>([
-    { 
-      id: 1, 
-      patientId: 1, 
-      patientNom: 'Benali', 
-      patientPrenom: 'Ahmed', 
-      date: '2026-01-08', 
-      heure: '09:00', 
-      motif: 'Consultation générale', 
-      status: 'confirmed' 
-    },
-    { 
-      id: 2, 
-      patientId: 2, 
-      patientNom: 'Zahrae', 
-      patientPrenom: 'Fatima', 
-      date: '2026-01-08', 
-      heure: '09:30', 
-      motif: 'Suivi traitement', 
-      status: 'confirmed' 
-    },
-    { 
-      id: 3, 
-      patientId: 3, 
-      patientNom: 'Alami', 
-      patientPrenom: 'Mohamed', 
-      date: '2026-01-08', 
-      heure: '10:30', 
-      motif: 'Première visite', 
-      status: 'pending' 
-    },
-    { 
-      id: 4, 
-      patientId: 4, 
-      patientNom: 'Idrissi', 
-      patientPrenom: 'Sara', 
-      date: '2026-01-08', 
-      heure: '14:00', 
-      motif: 'Contrôle', 
-      status: 'confirmed' 
-    },
-    { 
-      id: 5, 
-      patientId: 5, 
-      patientNom: 'Tazi', 
-      patientPrenom: 'Youssef', 
-      date: '2026-01-09', 
-      heure: '09:00', 
-      motif: 'Consultation', 
-      status: 'pending' 
-    },
-    { 
-      id: 6, 
-      patientId: 6, 
-      patientNom: 'El Fassi', 
-      patientPrenom: 'Amina', 
-      date: '2026-01-09', 
-      heure: '11:00', 
-      motif: 'Suivi', 
-      status: 'confirmed' 
-    }
-  ]);
-
-  // Compteur pour les IDs
-  private nextId = 7;
+  // Cache des rendez-vous pour éviter les appels répétés
+  private appointmentsCache = signal<RendezVousResponse[]>([]);
+  private lastFetchDate = signal<string>('');
 
   /**
-   * Récupère la liste des patients mock
+   * Retourne les headers avec le token d'authentification
    */
-  getPatients(): PatientForAppointment[] {
-    return this.mockPatients();
+  private getAuthHeaders(): HttpHeaders {
+    const token = this.authService.getToken();
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    });
   }
 
-  /**
-   * Récupère un patient par son ID
-   */
-  getPatientById(id: number): PatientForAppointment | undefined {
-    return this.mockPatients().find(p => p.id === id);
-  }
+  // ============ API CALLS ============
 
   /**
-   * Récupère tous les rendez-vous
+   * Récupère tous les rendez-vous du cabinet
    */
-  getAllAppointments(): Appointment[] {
-    return this.appointments();
+  getAllByCabinet(cabinetId: number): Observable<RendezVousResponse[]> {
+    console.log( this.getAuthHeaders() );
+    
+    return this.http.get<RendezVousResponse[]>(
+      `${this.API_URL}/cabinet/${cabinetId}`,
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   /**
    * Récupère les rendez-vous pour une date donnée
    */
-  getAppointmentsByDate(date: string): Appointment[] {
-    return this.appointments().filter(apt => apt.date === date && apt.status !== 'cancelled');
+  getByDate(date: string): Observable<RendezVousResponse[]> {
+    return this.http.get<RendezVousResponse[]>(
+      `${this.API_URL}/by-date?date=${date}`,
+      { headers: this.getAuthHeaders() }
+    ).pipe(
+      tap(appointments => {
+        this.appointmentsCache.set(appointments);
+        this.lastFetchDate.set(date);
+      })
+    );
   }
 
   /**
-   * Génère tous les créneaux horaires pour une date donnée
-   * avec indication de disponibilité
+   * Récupère les rendez-vous par cabinet et date
    */
-  getTimeSlotsForDate(date: string): TimeSlot[] {
+  getByCabinetAndDate(cabinetId: number, date: string): Observable<RendezVousResponse[]> {
+    // L'API ne supporte pas directement cette combinaison, on filtre côté client
+    return this.getAllByCabinet(cabinetId).pipe(
+      map(appointments => appointments.filter(apt => apt.dateRdv === date)),
+      tap(appointments => {
+        this.appointmentsCache.set(appointments);
+        this.lastFetchDate.set(date);
+      })
+    );
+  }
+
+  /**
+   * Récupère les rendez-vous par cabinet, médecin et date
+   */
+  getByCabinetMedecinAndDate(cabinetId: number, medecinId: number, date: string): Observable<RendezVousResponse[]> {
+    return this.http.get<RendezVousResponse[]>(
+      `${this.API_URL}/cabinet/${cabinetId}/medecin/${medecinId}?date=${date}`,
+      { headers: this.getAuthHeaders() }
+    ).pipe(
+      tap(appointments => {
+        this.appointmentsCache.set(appointments);
+        this.lastFetchDate.set(date);
+      })
+    );
+  }
+
+  /**
+   * Récupère un rendez-vous par son ID
+   */
+  getById(id: number): Observable<RendezVousResponse> {
+    return this.http.get<RendezVousResponse>(
+      `${this.API_URL}/${id}`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Crée un nouveau rendez-vous
+   */
+  create(request: RendezVousRequest): Observable<RendezVousResponse> {
+    return this.http.post<RendezVousResponse>(
+      this.API_URL,
+      request,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Met à jour un rendez-vous
+   */
+  update(id: number, request: RendezVousRequest): Observable<RendezVousResponse> {
+    return this.http.put<RendezVousResponse>(
+      `${this.API_URL}/${id}`,
+      request,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Confirme un rendez-vous
+   */
+  confirm(id: number): Observable<RendezVousResponse> {
+    return this.http.patch<RendezVousResponse>(
+      `${this.API_URL}/${id}/confirmer`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Annule un rendez-vous
+   */
+  cancel(id: number): Observable<RendezVousResponse> {
+    return this.http.patch<RendezVousResponse>(
+      `${this.API_URL}/${id}/annuler`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Supprime un rendez-vous (ADMIN uniquement)
+   */
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.API_URL}/${id}`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /**
+   * Récupère l'historique des rendez-vous d'un patient
+   */
+  getPatientHistory(cabinetId: number, patientId: number): Observable<RendezVousResponse[]> {
+    return this.http.get<RendezVousResponse[]>(
+      `${this.API_URL}/cabinet/${cabinetId}/patient/${patientId}`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  // ============ HELPERS ============
+
+  /**
+   * Génère tous les créneaux horaires pour une date donnée
+   * avec indication de disponibilité basée sur les RDV en cache
+   */
+  generateTimeSlots(appointments: RendezVousResponse[]): TimeSlot[] {
     const slots: TimeSlot[] = [];
-    const appointmentsForDate = this.getAppointmentsByDate(date);
+    // Filtrer les RDV annulés
+    const activeAppointments = appointments.filter(apt => apt.statut !== 'ANNULE');
 
     for (let hour = this.HEURE_DEBUT; hour < this.HEURE_FIN; hour++) {
       // Créneau à l'heure pile (ex: 09:00)
       const heure1 = `${hour.toString().padStart(2, '0')}:00`;
-      const apt1 = appointmentsForDate.find(a => a.heure === heure1);
+      const apt1 = activeAppointments.find(a => this.formatHeureForSlot(a.heureRdv) === heure1);
       slots.push({
         heure: heure1,
         isFree: !apt1,
@@ -149,7 +204,7 @@ export class AppointmentService {
 
       // Créneau à la demi-heure (ex: 09:30)
       const heure2 = `${hour.toString().padStart(2, '0')}:30`;
-      const apt2 = appointmentsForDate.find(a => a.heure === heure2);
+      const apt2 = activeAppointments.find(a => this.formatHeureForSlot(a.heureRdv) === heure2);
       slots.push({
         heure: heure2,
         isFree: !apt2,
@@ -161,84 +216,28 @@ export class AppointmentService {
   }
 
   /**
+   * Convertit l'heure API (HH:mm:ss) en format slot (HH:mm)
+   */
+  formatHeureForSlot(heureRdv: string): string {
+    // L'API retourne "10:30:00", on veut "10:30"
+    return heureRdv.substring(0, 5);
+  }
+
+  /**
+   * Convertit l'heure slot (HH:mm) en format API (HH:mm:ss)
+   */
+  formatHeureForApi(heureSlot: string): string {
+    return `${heureSlot}:00`;
+  }
+
+  /**
    * Vérifie si un créneau est disponible
    */
-  isSlotAvailable(date: string, heure: string, excludeAppointmentId?: number): boolean {
-    const appointments = this.getAppointmentsByDate(date);
-    return !appointments.some(apt => 
-      apt.heure === heure && apt.id !== excludeAppointmentId
+  isSlotAvailable(appointments: RendezVousResponse[], heure: string, excludeAppointmentId?: number): boolean {
+    const activeAppointments = appointments.filter(apt => 
+      apt.statut !== 'ANNULE' && apt.idRendezVous !== excludeAppointmentId
     );
-  }
-
-  /**
-   * Crée un nouveau rendez-vous
-   */
-  createAppointment(
-    patient: PatientForAppointment,
-    date: string,
-    heure: string,
-    motif: string
-  ): Appointment {
-    const newAppointment: Appointment = {
-      id: this.nextId++,
-      patientId: patient.id,
-      patientNom: patient.nom,
-      patientPrenom: patient.prenom,
-      date,
-      heure,
-      motif,
-      status: 'pending'
-    };
-
-    this.appointments.update(apts => [...apts, newAppointment]);
-    return newAppointment;
-  }
-
-  /**
-   * Met à jour un rendez-vous existant
-   */
-  updateAppointment(
-    id: number,
-    updates: Partial<Pick<Appointment, 'date' | 'heure' | 'motif' | 'status'>>
-  ): Appointment | null {
-    let updatedApt: Appointment | null = null;
-    
-    this.appointments.update(apts => 
-      apts.map(apt => {
-        if (apt.id === id) {
-          updatedApt = { ...apt, ...updates };
-          return updatedApt;
-        }
-        return apt;
-      })
-    );
-
-    return updatedApt;
-  }
-
-  /**
-   * Annule un rendez-vous
-   */
-  cancelAppointment(id: number): void {
-    this.appointments.update(apts =>
-      apts.map(apt => 
-        apt.id === id ? { ...apt, status: 'cancelled' as const } : apt
-      )
-    );
-  }
-
-  /**
-   * Supprime définitivement un rendez-vous
-   */
-  deleteAppointment(id: number): void {
-    this.appointments.update(apts => apts.filter(apt => apt.id !== id));
-  }
-
-  /**
-   * Récupère un rendez-vous par son ID
-   */
-  getAppointmentById(id: number): Appointment | undefined {
-    return this.appointments().find(apt => apt.id === id);
+    return !activeAppointments.some(apt => this.formatHeureForSlot(apt.heureRdv) === heure);
   }
 
   /**
@@ -260,5 +259,33 @@ export class AppointmentService {
   getTodayDate(): string {
     const today = new Date();
     return today.toISOString().split('T')[0];
+  }
+
+  /**
+   * Retourne le libellé du statut en français
+   */
+  getStatutLabel(statut: string): string {
+    switch (statut) {
+      case 'EN_ATTENTE': return 'En attente';
+      case 'CONFIRME': return 'Confirmé';
+      case 'ANNULE': return 'Annulé';
+      case 'EN_COURS': return 'En cours';
+      case 'TERMINE': return 'Terminé';
+      default: return statut;
+    }
+  }
+
+  /**
+   * Retourne les classes CSS pour le statut
+   */
+  getStatutClass(statut: string): string {
+    switch (statut) {
+      case 'CONFIRME': return 'bg-green-100 text-green-800';
+      case 'EN_ATTENTE': return 'bg-yellow-100 text-yellow-800';
+      case 'ANNULE': return 'bg-red-100 text-red-800';
+      case 'EN_COURS': return 'bg-blue-100 text-blue-800';
+      case 'TERMINE': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   }
 }

@@ -1,0 +1,239 @@
+<!-- Header de la page -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Consultation en cours</h1>
+    <p class="text-gray-600 mt-1">Patient: {{ currentPatient().prenom }} {{ currentPatient().nom }} ({{
+      currentPatient().age }} ans)</p>
+  </div>
+  <div class="flex items-center space-x-2">
+    <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full flex items-center">
+      <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+      En cours
+    </span>
+  </div>
+</div>
+
+<!-- Info patient -->
+<div class="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-6 mb-8 text-white">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="flex items-center space-x-4">
+      <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+        <span class="text-xl font-bold">{{ currentPatient().prenom[0] }}{{ currentPatient().nom[0] }}</span>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold">{{ currentPatient().prenom }} {{ currentPatient().nom }}</h2>
+        <div class="flex items-center space-x-4 mt-1 text-green-100">
+          <span>CIN: {{ currentPatient().cin }}</span>
+          <span>{{ currentPatient().age }} ans</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2 text-sm text-green-100">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <span>Début de consultation: 10:15</span>
+    </div>
+  </div>
+</div>
+
+<!-- Formulaire consultation -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+  <h3 class="text-lg font-semibold text-gray-900 mb-6">Détails de la consultation</h3>
+
+  <div class="space-y-6">
+    <!-- Type de consultation -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Type de consultation *</label>
+      <select [ngModel]="form().type" (ngModelChange)="updateForm('type', $event)"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200">
+        <option value="">Sélectionner un type</option>
+        @for (type of consultationTypes(); track type) {
+        <option [value]="type">{{ type }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Diagnostic -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Diagnostic *</label>
+      <textarea [ngModel]="form().diagnostic" (ngModelChange)="updateForm('diagnostic', $event)" rows="3"
+        placeholder="Entrez le diagnostic..."
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"></textarea>
+    </div>
+
+    <!-- Observations -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Observations cliniques</label>
+      <textarea [ngModel]="form().observations" (ngModelChange)="updateForm('observations', $event)" rows="4"
+        placeholder="Notes et observations cliniques..."
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"></textarea>
+    </div>
+
+
+    <!-- Examens complémentaires -->
+    <div class="border-t border-gray-100 pt-6">
+      <h4 class="text-md font-semibold text-gray-900 mb-4 flex items-center">
+        <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+          </path>
+        </svg>
+        Examens complémentaires
+      </h4>
+
+      <div class="flex gap-2 mb-4">
+        <input type="text" [ngModel]="nouvelExamen()" (ngModelChange)="nouvelExamen.set($event)"
+          placeholder="Ex: Analyse sanguine, Radio thoracique..."
+          class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+        <button (click)="addExamen()"
+          class="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+          Ajouter
+        </button>
+      </div>
+
+      @if (examensList().length > 0) {
+      <ul class="space-y-2 mb-4">
+        @for (exam of examensList(); track $index) {
+        <li class="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
+          <span class="text-gray-700">{{ exam }}</span>
+          <button (click)="removeExamen($index)" class="text-red-500 hover:text-red-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+
+    <!-- Prescription (Ordonnance) -->
+    <div class="border-t border-gray-100 pt-6">
+      <h4 class="text-md font-semibold text-gray-900 mb-4 flex items-center">
+        <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+          </path>
+        </svg>
+        Prescription Médicamenteuse
+      </h4>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-gray-50 p-4 rounded-lg">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Médicament</label>
+          <input type="text" [ngModel]="nouveauMedicament().nom"
+            (ngModelChange)="updateNouveauMedicament('nom', $event)" placeholder="Nom du médicament"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Dosage</label>
+          <input type="text" [ngModel]="nouveauMedicament().dosage"
+            (ngModelChange)="updateNouveauMedicament('dosage', $event)" placeholder="Ex: 500mg, 1 comprimé"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Durée</label>
+          <input type="text" [ngModel]="nouveauMedicament().duree"
+            (ngModelChange)="updateNouveauMedicament('duree', $event)" placeholder="Ex: 5 jours, 1 mois"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Instructions (Matin/Soir...)</label>
+          <input type="text" [ngModel]="nouveauMedicament().description"
+            (ngModelChange)="updateNouveauMedicament('description', $event)" placeholder="Instructions de prise"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+        </div>
+        <div class="md:col-span-2">
+          <button (click)="addMedicament()"
+            class="w-full py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
+            Ajouter médicament à l'ordonnance
+          </button>
+        </div>
+      </div>
+
+      <!-- Liste des médicaments ajoutés -->
+      @if (medicamentsList().length > 0) {
+      <table class="w-full mb-4">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Nom</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Dosage</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Durée</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Instructions</th>
+            <th class="px-3 py-2 w-10"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          @for (med of medicamentsList(); track $index) {
+          <tr>
+            <td class="px-3 py-2 text-sm text-gray-900 font-medium">{{ med.nom }}</td>
+            <td class="px-3 py-2 text-sm text-gray-500">{{ med.dosage }}</td>
+            <td class="px-3 py-2 text-sm text-gray-500">{{ med.duree }}</td>
+            <td class="px-3 py-2 text-sm text-gray-500">{{ med.description }}</td>
+            <td class="px-3 py-2 text-right">
+              <button (click)="removeMedicament($index)" class="text-red-500 hover:text-red-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="flex flex-col sm:flex-row gap-4">
+  <button (click)="saveConsultation()"
+    class="flex-1 inline-flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+    Enregistrer consultation
+  </button>
+
+  <button (click)="generateOrdonnance()"
+    class="flex-1 inline-flex items-center justify-center px-6 py-3 border border-green-600 text-green-600 hover:bg-green-50 font-medium rounded-lg transition-colors duration-200">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+      </path>
+    </svg>
+    Générer ordonnance
+  </button>
+
+
+
+  <button (click)="deleteConsultation()"
+    class="inline-flex items-center justify-center px-6 py-3 border border-red-300 text-red-600 hover:bg-red-50 font-medium rounded-lg transition-colors duration-200">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+      </path>
+    </svg>
+    Supprimer
+  </button>
+</div>
+
+<!-- Aide -->
+<div class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-4">
+  <div class="flex items-start">
+    <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>
+    <div>
+      <h4 class="text-sm font-medium text-blue-900">Rappel</h4>
+      <p class="text-sm text-blue-700 mt-1">
+        N'oubliez pas de vérifier les antécédents et allergies du patient avant de prescrire un traitement.
+        Les champs marqués d'un * sont obligatoires.
+      </p>
+    </div>
+  </div>
+</div>

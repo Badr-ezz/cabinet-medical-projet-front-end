@@ -1,0 +1,67 @@
+<nav class="bg-white shadow-md fixed w-full top-0 z-50 ">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-16">
+      <!-- Logo -->
+      <div class="flex items-center">
+        <a routerLink="/" class="flex items-center space-x-2">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+          <span class="text-xl font-bold text-gray-800">Cabinet <span class="text-green-600">Médical</span></span>
+        </a>
+      </div>
+
+      <!-- Desktop Menu -->
+      <div class="hidden md:flex items-center space-x-8">
+        <a routerLink="/" routerLinkActive="text-green-600" [routerLinkActiveOptions]="{exact: true}" 
+           class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium">
+          Accueil
+        </a>
+        <a href="#about" class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium">
+          À propos
+        </a>
+        <a href="#contact" class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium">
+          Contact
+        </a>
+        <a routerLink="/login" 
+           class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
+          Connexion
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <div class="md:hidden">
+        <button (click)="toggleMenu()" class="text-gray-700 hover:text-green-600 focus:outline-none">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            @if (!isMenuOpen()) {
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            } @else {
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            }
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    @if (isMenuOpen()) {
+      <div class="md:hidden pb-4">
+        <div class="flex flex-col space-y-3">
+          <a routerLink="/" (click)="closeMenu()" class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium py-2">
+            Accueil
+          </a>
+          <a href="#about" (click)="closeMenu()" class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium py-2">
+            À propos
+          </a>
+          <a href="#contact" (click)="closeMenu()" class="text-gray-700 hover:text-green-600 transition-colors duration-200 font-medium py-2">
+            Contact
+          </a>
+          <a routerLink="/login" (click)="closeMenu()" 
+             class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 text-center">
+            Connexion
+          </a>
+        </div>
+      </div>
+    }
+  </div>
+</nav>

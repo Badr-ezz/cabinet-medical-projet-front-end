@@ -1,0 +1,300 @@
+<!-- Messages de notification -->
+@if (successMessage()) {
+  <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+    {{ successMessage() }}
+  </div>
+}
+
+@if (errorMessage() && !showModal()) {
+  <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>
+    {{ errorMessage() }}
+  </div>
+}
+
+<!-- Header de la page -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
+    <p class="text-gray-600 mt-1">{{ filteredUsers().length }} utilisateur(s) sur {{ users().length }}</p>
+  </div>
+  <button 
+    (click)="openModal()"
+    [disabled]="isLoading()"
+    class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200">
+    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+    </svg>
+    Créer un compte utilisateur
+  </button>
+</div>
+
+<!-- Filtres (recherche et cabinet) -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+  <div class="flex flex-col md:flex-row md:items-center gap-4">
+    <!-- Recherche -->
+    <div class="flex-1">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Rechercher :</label>
+      <div class="relative">
+        <input 
+          type="text"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          placeholder="Login, nom, prénom, téléphone, cabinet..."
+          class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+        <svg class="w-5 h-5 absolute left-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+    </div>
+    
+    <!-- Filtre par cabinet -->
+    <div class="flex-1 max-w-md">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Filtrer par cabinet :</label>
+      <select 
+        [ngModel]="selectedCabinetId()"
+        (ngModelChange)="selectedCabinetId.set($event ? +$event : null)"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+        <option [ngValue]="null">Tous les cabinets</option>
+        @for (cabinet of cabinets(); track cabinet.id) {
+          <option [ngValue]="cabinet.id">{{ cabinet.nom }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Chargement -->
+@if (isLoading() && !showModal()) {
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+    <div class="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+    <p class="text-gray-500">Chargement des utilisateurs...</p>
+  </div>
+} @else {
+  <!-- Tableau des utilisateurs -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilisateur</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Login</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cabinet associé</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          @for (user of filteredUsers(); track user.id) {
+            <tr class="hover:bg-gray-50 transition-colors duration-200">
+              <td class="px-6 py-4">
+                <div class="flex items-center">
+                  <div class="w-10 h-10 rounded-full flex items-center justify-center mr-3" [class]="getRoleClass(user.role)">
+                    <span class="text-sm font-medium">
+                      {{ user.prenom[0] }}{{ user.nom[0] }}
+                    </span>
+                  </div>
+                  <div>
+                    <p class="font-medium text-gray-900">{{ user.prenom }} {{ user.nom }}</p>
+                    @if (user.signature) {
+                      <p class="text-xs text-gray-500">{{ user.signature }}</p>
+                    }
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 font-mono">{{ user.login }}</td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 text-xs font-medium rounded-full" [class]="getRoleClass(user.role)">
+                  {{ getRoleLabel(user.role) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">{{ user.numTel }}</td>
+              <td class="px-6 py-4 text-sm text-gray-600">{{ user.nomCabinet || '-' }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center justify-end space-x-2">
+                  <button 
+                    (click)="openEditModal(user)"
+                    class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                    title="Modifier">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </button>
+                  <button 
+                    (click)="deleteUser(user)"
+                    class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                    title="Supprimer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="px-6 py-12 text-center">
+                <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                @if (searchTerm() || selectedCabinetId()) {
+                  <p class="text-gray-500">Aucun utilisateur ne correspond aux critères</p>
+                  <button 
+                    (click)="searchTerm.set(''); selectedCabinetId.set(null)"
+                    class="mt-2 text-green-600 hover:text-green-700 font-medium">
+                    Réinitialiser les filtres
+                  </button>
+                } @else {
+                  <p class="text-gray-500">Aucun utilisateur trouvé</p>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+<!-- Modal Créer/Modifier utilisateur -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" (click)="closeModal()"></div>
+      
+      <div class="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-auto z-50">
+        <div class="p-6 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">
+              {{ editingUser() ? 'Modifier l\'utilisateur' : 'Créer un compte utilisateur' }}
+            </h3>
+            <button (click)="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg">
+              <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <div class="p-6 space-y-4">
+          <!-- Erreur dans le modal -->
+          @if (errorMessage()) {
+            <div class="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+              <input 
+                type="text"
+                [ngModel]="formData().nom"
+                (ngModelChange)="updateFormField('nom', $event)"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+              <input 
+                type="text"
+                [ngModel]="formData().prenom"
+                (ngModelChange)="updateFormField('prenom', $event)"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Login *</label>
+              <input 
+                type="text"
+                [ngModel]="formData().login"
+                (ngModelChange)="updateFormField('login', $event)"
+                [disabled]="editingUser() !== null"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Mot de passe {{ editingUser() ? '' : '*' }}
+              </label>
+              <input 
+                type="password"
+                [ngModel]="formData().pwd"
+                (ngModelChange)="updateFormField('pwd', $event)"
+                [placeholder]="editingUser() ? 'Laisser vide pour garder l\'ancien' : ''"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Rôle *</label>
+            <select 
+              [ngModel]="formData().role"
+              (ngModelChange)="updateFormField('role', $event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              @for (role of roles; track role.value) {
+                <option [value]="role.value">{{ role.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+            <input 
+              type="text"
+              [ngModel]="formData().numTel"
+              (ngModelChange)="updateFormField('numTel', $event)"
+              placeholder="0612345678"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Cabinet associé *</label>
+            <select 
+              [ngModel]="formData().cabinetId"
+              (ngModelChange)="updateFormField('cabinetId', +$event)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+              <option [ngValue]="0" disabled>Sélectionner un cabinet</option>
+              @for (cabinet of cabinets(); track cabinet.id) {
+                <option [ngValue]="cabinet.id">{{ cabinet.nom }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Signature (optionnel)</label>
+            <input 
+              type="text"
+              [ngModel]="formData().signature"
+              (ngModelChange)="updateFormField('signature', $event)"
+              placeholder="Dr. Mohammed Alami"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+          </div>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+          <button 
+            (click)="closeModal()"
+            class="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-colors duration-200">
+            Annuler
+          </button>
+          <button 
+            (click)="saveUser()"
+            [disabled]="isLoading()"
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 flex items-center">
+            @if (isLoading()) {
+              <div class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+            }
+            {{ editingUser() ? 'Modifier' : 'Créer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

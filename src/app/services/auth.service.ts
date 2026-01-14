@@ -11,7 +11,7 @@ import { AuthResponse } from '../models/auth-response.model';
  * - Appeler l'API de login
  * - Stocker le token JWT dans localStorage
  * - Décoder le token pour extraire le rôle utilisateur
- * - Gérer la déconnexion
+ * - Gérer la déconnexion /user-service/api/auth/register
  */
 @Injectable({
   providedIn: 'root'
@@ -19,7 +19,7 @@ import { AuthResponse } from '../models/auth-response.model';
 export class AuthService {
   
   // URL de base de l'API d'authentification
-  private readonly API_URL = 'http://localhost:8081/api/auth';
+  private readonly API_URL = 'http://localhost:8089/api/auth';
   
   // Clé pour stocker le token dans localStorage
   private readonly TOKEN_KEY = 'jwt_token';

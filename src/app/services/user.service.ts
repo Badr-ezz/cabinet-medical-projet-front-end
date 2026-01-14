@@ -23,7 +23,7 @@ import { AuthService } from './auth.service';
 export class UserService {
   
   // URL de base de l'API user-service
-  private readonly API_URL = 'http://localhost:8081/api/users';
+  private readonly API_URL = 'http://localhost:8089/api/users';
   
   private http = inject(HttpClient);
   private authService = inject(AuthService);

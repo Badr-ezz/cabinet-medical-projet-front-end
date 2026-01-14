@@ -2,15 +2,47 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Liste d'attente</h1>
-    <p class="text-gray-600 mt-1">{{ waitingPatients().length }} patients en attente</p>
+    <p class="text-gray-600 mt-1">{{ waitingPatients().length }} patients en attente pour le {{ today }}</p>
   </div>
-  <div class="flex items-center space-x-2 text-sm text-gray-600">
-    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-    </svg>
-    <span>Temps moyen d'attente : <strong class="text-green-600">{{ estimatedWaitTime() }} min</strong> par patient</span>
+  <div class="flex items-center space-x-4">
+    <!-- Bouton Rafraîchir -->
+    <button 
+      (click)="refreshList()"
+      [disabled]="isLoadingList()"
+      class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors duration-200 disabled:opacity-50">
+      <svg class="w-4 h-4 mr-2" [class.animate-spin]="isLoadingList()" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+      Rafraîchir
+    </button>
+    <div class="flex items-center space-x-2 text-sm text-gray-600">
+      <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <span>Temps moyen d'attente : <strong class="text-green-600">{{ estimatedWaitTime() }} min</strong> par patient</span>
+    </div>
   </div>
 </div>
+
+<!-- Message d'erreur -->
+@if (errorMessage()) {
+  <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+    <div class="flex items-center">
+      <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <p class="text-red-700">{{ errorMessage() }}</p>
+    </div>
+  </div>
+}
+
+<!-- Indicateur de chargement principal -->
+@if (isLoadingList()) {
+  <div class="flex justify-center items-center py-12">
+    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+    <span class="ml-3 text-gray-600">Chargement des rendez-vous du jour...</span>
+  </div>
+} @else {
 
 <!-- Indicateur de progression -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
@@ -114,3 +146,5 @@
     </div>
   </div>
 </div>
+
+} <!-- Fin du @else isLoadingList -->

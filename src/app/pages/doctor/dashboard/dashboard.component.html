@@ -6,20 +6,10 @@
 
 <!-- Message de bienvenue -->
 <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 mb-8 text-white">
-  <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-    <div>
-      <h2 class="text-2xl font-bold mb-2">Bienvenue, {{ doctorName() }} 👋</h2>
-      <p class="text-green-100">Vous avez 12 consultations prévues aujourd'hui. 3 patients sont en attente.</p>
-    </div>
-    <div class="mt-4 md:mt-0">
-      <button (click)="newConsultation()"
-        class="inline-flex items-center px-4 py-2 bg-white text-green-700 font-medium rounded-lg hover:bg-green-50 transition-colors duration-200">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-        Nouvelle consultation
-      </button>
-    </div>
+  <div>
+    <h2 class="text-2xl font-bold mb-2">Bienvenue, {{ doctorName() }} 👋</h2>
+    <p class="text-green-100">Vous avez {{ todayPatients().length }} consultations prévues aujourd'hui. {{
+      getPatientsEnAttente() }} patients sont en attente.</p>
   </div>
 </div>
 
@@ -102,7 +92,8 @@
               {{ getStatusLabel(patient.status) }}
             </span>
             @if (patient.status === 'en-attente') {
-            <button class="text-green-600 hover:text-green-700 text-sm font-medium">
+            <button (click)="startConsultation(patient)"
+              class="text-green-600 hover:text-green-700 text-sm font-medium">
               Appeler
             </button>
             }
@@ -119,66 +110,47 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">Activité récente</h3>
       <div class="space-y-4">
+        @if (recentActivities().length > 0) {
+        @for (activity of recentActivities(); track activity.id) {
         <div class="flex items-start space-x-3">
-          <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+            [ngClass]="activity.type === 'consultation' ? 'bg-green-100' : activity.type === 'ordonnance' ? 'bg-purple-100' : 'bg-blue-100'">
+            @if (activity.type === 'consultation') {
             <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
-          </div>
-          <div>
-            <p class="text-sm text-gray-900">Consultation terminée</p>
-            <p class="text-xs text-gray-500">Fatima El Fassi - il y a 15 min</p>
-          </div>
-        </div>
-        <div class="flex items-start space-x-3">
-          <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+            } @else if (activity.type === 'ordonnance') {
             <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
               </path>
             </svg>
-          </div>
-          <div>
-            <p class="text-sm text-gray-900">Ordonnance générée</p>
-            <p class="text-xs text-gray-500">Ahmed Benali - il y a 45 min</p>
-          </div>
-        </div>
-        <div class="flex items-start space-x-3">
-          <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+            } @else {
             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
               </path>
             </svg>
+            }
           </div>
           <div>
-            <p class="text-sm text-gray-900">Nouveau patient</p>
-            <p class="text-xs text-gray-500">Nadia Chraibi - il y a 2h</p>
+            <p class="text-sm text-gray-900">{{ activity.label }}</p>
+            <p class="text-xs text-gray-500">{{ activity.description }}</p>
           </div>
         </div>
+        }
+        } @else {
+        <p class="text-sm text-gray-500 text-center py-4">Aucune activité récente</p>
+        }
       </div>
     </div>
 
-    <!-- Graphique placeholder -->
+    <!-- Graphique des consultations -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">Consultations cette semaine</h3>
-      <div class="h-40 bg-gray-50 rounded-lg flex items-center justify-center">
-        <div class="text-center">
-          <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-            </path>
-          </svg>
-          <p class="text-sm text-gray-400">Graphique des consultations</p>
-        </div>
-      </div>
-      <div class="mt-4 flex justify-between text-sm">
-        <span class="text-gray-500">Lun</span>
-        <span class="text-gray-500">Mar</span>
-        <span class="text-gray-500">Mer</span>
-        <span class="text-gray-500">Jeu</span>
-        <span class="text-gray-500">Ven</span>
-        <span class="text-gray-500">Sam</span>
+      <div style="height: 200px;">
+        <canvas baseChart [data]="weeklyChartData" [options]="weeklyChartOptions" type="bar">
+        </canvas>
       </div>
     </div>
   </div>

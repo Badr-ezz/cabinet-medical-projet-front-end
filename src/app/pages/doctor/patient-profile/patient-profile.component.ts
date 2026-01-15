@@ -1,7 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink, Router, ActivatedRoute } from '@angular/router';
+import { CommonModule, DatePipe } from '@angular/common';
 import { PatientService } from '../../../services/patient.service';
 import { ConsultationService } from '../../../services/consultation.service';
+import { DossierMedicalService } from '../../../services/dossier-medical.service';
 import { Patient } from '../../../models/patient.model';
 import { MedicalContextService } from '../../../services/medical-context.service';
 
@@ -16,7 +18,7 @@ interface Consultation {
 @Component({
   selector: 'app-patient-profile',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, CommonModule, DatePipe],
   templateUrl: './patient-profile.component.html'
 })
 export class PatientProfileComponent implements OnInit {
@@ -24,6 +26,7 @@ export class PatientProfileComponent implements OnInit {
   private router = inject(Router);
   private patientService = inject(PatientService);
   private consultationService = inject(ConsultationService);
+  private dossierMedicalService = inject(DossierMedicalService);
   private contextService = inject(MedicalContextService);
 
   // Initialize with empty/default data to avoid template errors before load
@@ -79,6 +82,9 @@ export class PatientProfileComponent implements OnInit {
 
         // Load consultations for this patient
         this.loadConsultations(id);
+
+        // Load dossier medical for this patient
+        this.loadDossierMedical(id);
       },
       error: (err) => {
         console.error('Error loading patient', err);
@@ -92,7 +98,7 @@ export class PatientProfileComponent implements OnInit {
         // Map backend Consultation[] to local interface
         const mapped = consultations.map(c => ({
           id: c.id,
-          date: c.dateConsultation,
+          date: c.createdAt || c.dateConsultation,  // Use createdAt (date+time) or fallback to dateConsultation
           type: c.type,
           diagnostic: c.diagnostic,
           medecin: 'Dr. ' + (c.medecinId || 'Inconnu') // You might need to fetch medecin name separately
@@ -102,6 +108,23 @@ export class PatientProfileComponent implements OnInit {
       error: (err) => {
         console.error('Error loading consultations for patient', err);
         this.historiqueConsultations.set([]);
+      }
+    });
+  }
+
+  loadDossierMedical(patientId: number) {
+    this.dossierMedicalService.getByPatientId(patientId).subscribe({
+      next: (dossier) => {
+        this.dossierMedical.set({
+          antecedentsMedicaux: dossier.antecedentsMedicaux || 'Aucun antécédent notable',
+          antecedentsChirurgicaux: dossier.antecedentsChirurgicaux || 'Aucune chirurgie',
+          allergies: dossier.allergies || 'Aucune',
+          traitementsEnCours: dossier.traitements || 'Aucun',
+          habitudes: dossier.habitudes || 'Non renseigné'
+        });
+      },
+      error: (err) => {
+        // Silent fail - patient has no dossier medical yet, keep default values
       }
     });
   }

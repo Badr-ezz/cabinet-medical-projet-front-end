@@ -55,8 +55,8 @@ export class AppointmentService {
    * Récupère tous les rendez-vous du cabinet
    */
   getAllByCabinet(cabinetId: number): Observable<RendezVousResponse[]> {
-    console.log( this.getAuthHeaders() );
-    
+    console.log(this.getAuthHeaders());
+
     return this.http.get<RendezVousResponse[]>(
       `${this.API_URL}/cabinet/${cabinetId}`,
       { headers: this.getAuthHeaders() }
@@ -75,6 +75,16 @@ export class AppointmentService {
         this.appointmentsCache.set(appointments);
         this.lastFetchDate.set(date);
       })
+    );
+  }
+
+  /**
+   * Récupère un rendez-vous par son ID
+   */
+  getById(id: number): Observable<RendezVousResponse> {
+    return this.http.get<RendezVousResponse>(
+      `${this.API_URL}/${id}`,
+      { headers: this.getAuthHeaders() }
     );
   }
 
@@ -104,16 +114,6 @@ export class AppointmentService {
         this.appointmentsCache.set(appointments);
         this.lastFetchDate.set(date);
       })
-    );
-  }
-
-  /**
-   * Récupère un rendez-vous par son ID
-   */
-  getById(id: number): Observable<RendezVousResponse> {
-    return this.http.get<RendezVousResponse>(
-      `${this.API_URL}/${id}`,
-      { headers: this.getAuthHeaders() }
     );
   }
 
@@ -234,7 +234,7 @@ export class AppointmentService {
    * Vérifie si un créneau est disponible
    */
   isSlotAvailable(appointments: RendezVousResponse[], heure: string, excludeAppointmentId?: number): boolean {
-    const activeAppointments = appointments.filter(apt => 
+    const activeAppointments = appointments.filter(apt =>
       apt.statut !== 'ANNULE' && apt.idRendezVous !== excludeAppointmentId
     );
     return !activeAppointments.some(apt => this.formatHeureForSlot(apt.heureRdv) === heure);
@@ -245,9 +245,9 @@ export class AppointmentService {
    */
   formatDate(dateStr: string): string {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', { 
-      weekday: 'long', 
-      day: 'numeric', 
+    return date.toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
       month: 'long',
       year: 'numeric'
     });

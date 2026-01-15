@@ -34,7 +34,7 @@ import { Patient } from '../../../models/patient.model';
             @for (consultation of consultations(); track consultation.id) {
               <tr class="hover:bg-gray-50 transition-colors duration-150">
                 <td class="px-6 py-4 text-sm text-gray-700">
-                  {{ consultation.dateConsultation | date:'dd/MM/yyyy HH:mm' }}
+                  {{ (consultation.createdAt || consultation.dateConsultation) | date:'dd/MM/yyyy HH:mm' }}
                 </td>
                 <td class="px-6 py-4">
                   <div class="flex items-center">

@@ -4,9 +4,11 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { ConsultationService } from '../../../services/consultation.service';
 import { AuthService } from '../../../services/auth.service';
 import { PatientService } from '../../../services/patient.service';
+import { AppointmentService } from '../../../services/appointment.service';
 
 interface ConsultationForm {
   type: string;
+  dateConsultation: string;
   diagnostic: string;
   observations: string;
   traitement: string;
@@ -23,6 +25,7 @@ export class ConsultationComponent implements OnInit {
   private consultationService = inject(ConsultationService);
   private patientService = inject(PatientService);
   private authService = inject(AuthService);
+  private appointmentService = inject(AppointmentService);
 
   // Default mock, will be overwritten by real data
   currentPatient = signal({
@@ -34,6 +37,7 @@ export class ConsultationComponent implements OnInit {
   });
 
   consultationId: number | null = null;
+  rendezVousId: number | null = null; // Track the appointment ID
 
   private route = inject(ActivatedRoute);
 
@@ -50,6 +54,7 @@ export class ConsultationComponent implements OnInit {
             // Populate Form
             this.form.set({
               type: c.type || '',
+              dateConsultation: c.dateConsultation || new Date().toISOString().split('T')[0],
               diagnostic: c.diagnostic || '',
               observations: c.observations || '',
               traitement: ''
@@ -118,6 +123,7 @@ export class ConsultationComponent implements OnInit {
 
   form = signal<ConsultationForm>({
     type: '',
+    dateConsultation: new Date().toISOString().split('T')[0], // Default to today
     diagnostic: '',
     observations: '',
     traitement: ''
@@ -185,8 +191,8 @@ export class ConsultationComponent implements OnInit {
       return;
     }
 
-    // Mock Appointment ID for now - real app needs this passed in
-    const rendezVousId = 1;
+    // Use tracked rendezVousId, default to 1 if not available
+    const rendezVousId = this.rendezVousId || 1;
 
     // Build payload matching ConsultationRequest interface
     const payload = {
@@ -194,7 +200,7 @@ export class ConsultationComponent implements OnInit {
       medecinId: user.id,
       rendezVousId: rendezVousId,
       type: this.form().type || 'CONSULTATION',
-      dateConsultation: new Date().toISOString().split('T')[0],
+      dateConsultation: new Date().toISOString().split('T')[0], // Today's date YYYY-MM-DD
       diagnostic: this.form().diagnostic,
       observations: this.form().observations,
       examenSupplementaire: this.examensList().join('\n'), // Join exams for backend string field

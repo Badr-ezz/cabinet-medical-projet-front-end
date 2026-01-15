@@ -14,16 +14,16 @@ export interface Ordonnance {
 export interface Consultation {
     id: number;
     patientId: number;
-    medecinId: number;
     rendezVousId?: number;
-    dateConsultation: string;
+    medecinId: number;
     type: string;
+    dateConsultation: string; // LocalDate from backend
+    createdAt?: string;  // LocalDateTime from backend - actual date/time of consultation
     diagnostic: string;
-    examenClinique?: string;        // Added
-    examenSupplementaire?: string;  // Added
+    examenClinique?: string;
+    examenSupplementaire?: string;
     observations?: string;
-    ordonnances?: Ordonnance[];     // Added (Backend returns list of Ordonnances)
-    createdAt?: string;
+    ordonnances?: Ordonnance[];
 }
 
 export interface ConsultationRequest {

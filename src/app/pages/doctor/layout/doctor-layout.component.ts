@@ -1,8 +1,9 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../services/auth.service';
 import { MedicalContextService } from '../../../services/medical-context.service';
+import { MedecinService } from '../../../services/medecin.service';
 
 interface MenuItem {
   label: string;
@@ -18,12 +19,15 @@ interface MenuItem {
   imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule], // Need CommonModule/NgClass for dropdown
   templateUrl: './doctor-layout.component.html'
 })
-export class DoctorLayoutComponent {
+export class DoctorLayoutComponent implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
   private contextService = inject(MedicalContextService);
+  private medecinService = inject(MedecinService);
 
   isSidebarOpen = signal(false);
+  doctorName = signal('Dr. Médecin');
+  doctorSpecialty = signal('Médecin généraliste');
 
   menuItems = signal<MenuItem[]>([
     { label: 'Dashboard', icon: 'dashboard', route: '/doctor/dashboard' },
@@ -57,6 +61,25 @@ export class DoctorLayoutComponent {
 
   toggleSidebar() {
     this.isSidebarOpen.update(v => !v);
+  }
+
+  ngOnInit() {
+    this.loadDoctorInfo();
+  }
+
+  loadDoctorInfo() {
+    const user = this.authService.getUser();
+    if (user && user.id) {
+      this.medecinService.getById(user.id).subscribe({
+        next: (medecin) => {
+          this.doctorName.set(`Dr. ${medecin.nom} ${medecin.prenom}`);
+          this.doctorSpecialty.set(medecin.specialite || 'Médecin généraliste');
+        },
+        error: (err) => {
+          console.error('Error loading doctor info', err);
+        }
+      });
+    }
   }
 
   logout() {

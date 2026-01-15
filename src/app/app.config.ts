@@ -1,21 +1,15 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
+import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 
 import { routes } from './app.routes';
 
-/**
- * Configuration de l'application Angular
- * 
- * Providers configurés :
- * - provideZoneChangeDetection : Optimise la détection de changements
- * - provideRouter : Configure le routage avec les routes définies
- * - provideHttpClient : Active HttpClient pour les appels API
- */
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }), 
+    provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient() // Nécessaire pour AuthService
+    provideHttpClient(),
+    provideCharts(withDefaultRegisterables())
   ]
 };

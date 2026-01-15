@@ -1,8 +1,9 @@
 import { Component, signal, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { CommonModule, DatePipe } from '@angular/common';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PatientService } from '../../../services/patient.service';
+import { ConsultationService } from '../../../services/consultation.service';
 
 interface DossierMedical {
   antecedentsMedicaux: string;
@@ -12,15 +13,23 @@ interface DossierMedical {
   habitudes: string;
 }
 
+interface Consultation {
+  id: number;
+  date: string;
+  type: string;
+  diagnostic: string;
+}
+
 @Component({
   selector: 'app-medical-record',
   standalone: true,
-  imports: [FormsModule, CommonModule],
+  imports: [FormsModule, CommonModule, RouterLink, DatePipe],
   templateUrl: './medical-record.component.html'
 })
 export class MedicalRecordComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private patientService = inject(PatientService);
+  private consultationService = inject(ConsultationService);
 
   currentPatient = signal({
     id: 0,
@@ -36,6 +45,8 @@ export class MedicalRecordComponent implements OnInit {
     traitementsEnCours: '', // Backend key 'traitements' mapped manually if needed
     habitudes: ''
   });
+
+  consultations = signal<Consultation[]>([]);
 
   // Navigation tabs
   activeTab = signal<'summary' | 'history' | 'lifestyle' | 'consultations' | 'documents'>('summary');
@@ -81,6 +92,27 @@ export class MedicalRecordComponent implements OnInit {
         }
       },
       error: (err) => console.error('Error loading dossier', err)
+    });
+
+    // 3. Load Consultations
+    this.loadConsultations(patientId);
+  }
+
+  loadConsultations(patientId: number) {
+    this.consultationService.getByPatientId(patientId).subscribe({
+      next: (consultations) => {
+        const mapped = consultations.map(c => ({
+          id: c.id,
+          date: c.createdAt || c.dateConsultation,  // Use createdAt (date+time) or fallback to dateConsultation
+          type: c.type,
+          diagnostic: c.diagnostic
+        }));
+        this.consultations.set(mapped);
+      },
+      error: (err) => {
+        console.error('Error loading consultations', err);
+        this.consultations.set([]);
+      }
     });
   }
 

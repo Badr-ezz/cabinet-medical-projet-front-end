@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, computed } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
 
@@ -18,13 +18,17 @@ export class AdminLayoutComponent {
   private authService = inject(AuthService);
   
   isSidebarOpen = signal(false);
+
+  // Informations utilisateur connecté
+  userName = computed(() => this.authService.getUserFullName());
+  userInitials = computed(() => this.authService.getUserInitials());
+  userRole = computed(() => this.authService.getRoleLabel());
   
   menuItems = signal<MenuItem[]>([
     { label: 'Dashboard', icon: 'dashboard', route: '/admin/dashboard' },
     { label: 'Cabinets', icon: 'cabinets', route: '/admin/cabinets' },
     { label: 'Utilisateurs', icon: 'users', route: '/admin/users' },
-    { label: 'Médicaments', icon: 'medications', route: '/admin/medications' },
-    { label: 'Paramètres', icon: 'settings', route: '/admin/settings' }
+    { label: 'Médicaments', icon: 'medications', route: '/admin/medications' }
   ]);
 
   toggleSidebar() {

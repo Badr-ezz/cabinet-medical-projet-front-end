@@ -4,8 +4,10 @@ import { ActivatedRoute } from '@angular/router';
 import { AppointmentService } from '../../../services/appointment.service';
 import { PatientService } from '../../../services/patient.service';
 import { AuthService } from '../../../services/auth.service';
+import { BillingService } from '../../../services/billing.service';
 import { RendezVousResponse, RendezVousRequest, TimeSlot, PatientForAppointment, StatutRDV } from '../../../models/appointment.model';
 import { Patient } from '../../../models/patient.model';
+import { FactureRequest } from '../../../models/facture.model';
 
 /**
  * AppointmentsComponent - Vue Agenda Journalier
@@ -30,6 +32,7 @@ export class AppointmentsComponent implements OnInit {
   private appointmentService = inject(AppointmentService);
   private patientService = inject(PatientService);
   private authService = inject(AuthService);
+  private billingService = inject(BillingService);
   private route = inject(ActivatedRoute);
 
   // ID du cabinet (extrait du token JWT)
@@ -65,7 +68,9 @@ export class AppointmentsComponent implements OnInit {
   createForm = signal({
     patientId: 0,
     motif: '',
-    notes: ''
+    notes: '',
+    montant: 200, // Montant par défaut pour la facture
+    modePaiement: 'ESPECES' as 'ESPECES' | 'CARTE' | 'CHEQUE' | 'VIREMENT' // Mode de paiement par défaut
   });
 
   // Formulaire modification
@@ -233,7 +238,9 @@ export class AppointmentsComponent implements OnInit {
     this.createForm.set({
       patientId: preselected ? preselected.id : 0,
       motif: '',
-      notes: ''
+      notes: '',
+      montant: 200, // Montant par défaut
+      modePaiement: 'ESPECES' // Mode de paiement par défaut
     });
     
     this.isCreateModalOpen.set(true);
@@ -245,17 +252,35 @@ export class AppointmentsComponent implements OnInit {
   closeCreateModal(): void {
     this.isCreateModalOpen.set(false);
     this.selectedSlot.set(null);
+    // Reset the form
+    this.createForm.set({
+      patientId: 0,
+      motif: '',
+      notes: '',
+      montant: 200,
+      modePaiement: 'ESPECES'
+    });
   }
 
   /**
    * Crée un nouveau rendez-vous via l'API
+   * Crée également une facture associée avec statut EN_ATTENTE
    */
   createAppointment(): void {
     const slot = this.selectedSlot();
     const form = this.createForm();
+    const preselected = this.preselectedPatient();
     
-    if (!slot || !form.patientId || !form.motif) {
+    // Utilise le patient pré-sélectionné ou celui du formulaire
+    const patientId = preselected ? preselected.id : form.patientId;
+    
+    if (!slot || !patientId || !form.motif) {
       this.showError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (form.montant <= 0) {
+      this.showError('Le montant doit être supérieur à 0');
       return;
     }
 
@@ -265,18 +290,58 @@ export class AppointmentsComponent implements OnInit {
       motif: form.motif,
       statut: 'EN_ATTENTE',
       notes: form.notes || undefined,
-      patientId: form.patientId,
+      patientId: patientId,
       cabinetId: this.cabinetId()
     };
 
     this.isSubmitting.set(true);
+
+    // Debug: afficher le token et le rôle
+    console.log('Token:', this.authService.getToken());
+    console.log('Role:', this.authService.getUserRole());
+    console.log('RDV Request:', request);
+    
+    // 1. Créer le rendez-vous
     this.appointmentService.create(request).subscribe({
-      next: () => {
-        this.showSuccess('Rendez-vous créé avec succès');
-        this.closeCreateModal();
-        this.loadAppointments(); // Recharge la liste
-        this.preselectedPatient.set(null);
-        this.isSubmitting.set(false);
+      next: (rdvResponse) => {
+        if (!rdvResponse || !rdvResponse.idRendezVous) {
+          this.showError('Erreur: le rendez-vous n\'a pas été créé correctement');
+          this.isSubmitting.set(false);
+          return;
+        }
+
+        // 2. Créer la facture associée (statut EN_ATTENTE défini automatiquement par le backend)
+        const factureRequest: FactureRequest = {
+          rendezVousId: rdvResponse.idRendezVous,
+          cabinetId: this.cabinetId(),
+          montant: form.montant,
+          modePaiement: form.modePaiement
+        };
+
+        console.log('Création facture avec:', factureRequest);
+
+        this.billingService.create(factureRequest).subscribe({
+          next: (factureResponse) => {
+            if (factureResponse) {
+              this.showSuccess('Rendez-vous et facture créés avec succès');
+            } else {
+              this.showSuccess('Rendez-vous créé (facture: erreur)');
+            }
+            this.closeCreateModal();
+            this.loadAppointments();
+            this.preselectedPatient.set(null);
+            this.isSubmitting.set(false);
+          },
+          error: (err) => {
+            console.error('Erreur création facture:', err);
+            // Le RDV est créé mais pas la facture - on affiche quand même un succès partiel
+            this.showSuccess('Rendez-vous créé (facture non créée)');
+            this.closeCreateModal();
+            this.loadAppointments();
+            this.preselectedPatient.set(null);
+            this.isSubmitting.set(false);
+          }
+        });
       },
       error: (err) => {
         console.error('Erreur création RDV:', err);
@@ -476,6 +541,14 @@ export class AppointmentsComponent implements OnInit {
 
   updateCreateNotes(notes: string): void {
     this.createForm.update(f => ({ ...f, notes }));
+  }
+
+  updateCreateMontant(montant: string): void {
+    this.createForm.update(f => ({ ...f, montant: +montant || 0 }));
+  }
+
+  updateCreateModePaiement(modePaiement: string): void {
+    this.createForm.update(f => ({ ...f, modePaiement: modePaiement as 'ESPECES' | 'CARTE' | 'CHEQUE' | 'VIREMENT' }));
   }
 
   updateEditHeure(heure: string): void {

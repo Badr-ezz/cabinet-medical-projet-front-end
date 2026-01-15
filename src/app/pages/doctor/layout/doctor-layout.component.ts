@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, computed } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
 
@@ -18,6 +18,15 @@ export class DoctorLayoutComponent {
   private authService = inject(AuthService);
   
   isSidebarOpen = signal(false);
+
+  // Informations utilisateur connecté
+  userName = computed(() => {
+    const fullName = this.authService.getUserFullName();
+    // Ajouter "Dr." si c'est un médecin
+    return this.authService.getUserRole() === 'MEDECIN' ? `Dr. ${fullName}` : fullName;
+  });
+  userInitials = computed(() => this.authService.getUserInitials());
+  userRole = computed(() => this.authService.getRoleLabel());
   
   menuItems = signal<MenuItem[]>([
     { label: 'Dashboard', icon: 'dashboard', route: '/doctor/dashboard' },

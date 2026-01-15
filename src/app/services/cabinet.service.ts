@@ -22,7 +22,7 @@ import { Cabinet, CreateCabinetRequest } from '../models/cabinet.model';
 export class CabinetService {
   
   // URL de base de l'API cabinet-service
-  private readonly API_URL = 'http://localhost:8081/api/cabinets';
+  private readonly API_URL = 'http://localhost:8082/api/cabinets';
   
   private http = inject(HttpClient);
 

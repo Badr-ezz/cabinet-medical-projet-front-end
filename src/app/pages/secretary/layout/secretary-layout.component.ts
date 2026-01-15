@@ -1,4 +1,4 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, computed } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../../services/auth.service';
 
@@ -19,6 +19,11 @@ export class SecretaryLayoutComponent {
   
   // Signal pour l'état de la sidebar sur mobile
   isSidebarOpen = signal(false);
+
+  // Informations utilisateur connecté
+  userName = computed(() => this.authService.getUserFullName());
+  userInitials = computed(() => this.authService.getUserInitials());
+  userRole = computed(() => this.authService.getRoleLabel());
 
   // Menu items de la sidebar
   menuItems = signal<MenuItem[]>([

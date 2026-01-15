@@ -122,6 +122,131 @@ export class AuthService {
   }
 
   /**
+   * Récupère le nom de l'utilisateur depuis le token JWT
+   * @returns Le nom ou null
+   */
+  getUserNom(): string | null {
+    const token = this.getToken();
+    
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.decodeToken(token);
+      return payload?.nom || null;
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Récupère le prénom de l'utilisateur depuis le token JWT
+   * @returns Le prénom ou null
+   */
+  getUserPrenom(): string | null {
+    const token = this.getToken();
+    
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.decodeToken(token);
+      return payload?.prenom || null;
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Récupère le login de l'utilisateur depuis le token JWT
+   * @returns Le login ou null
+   */
+  getUserLogin(): string | null {
+    const token = this.getToken();
+    
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.decodeToken(token);
+      // Le login peut être dans 'sub' (subject) ou 'login'
+      return payload?.sub || payload?.login || null;
+    } catch (error) {
+      console.error('Erreur lors du décodage du token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Récupère le nom complet de l'utilisateur (Prénom Nom)
+   * @returns Le nom complet ou le login ou 'Utilisateur'
+   */
+  getUserFullName(): string {
+    const prenom = this.getUserPrenom();
+    const nom = this.getUserNom();
+    
+    if (prenom && nom) {
+      return `${prenom} ${nom}`;
+    } else if (prenom) {
+      return prenom;
+    } else if (nom) {
+      return nom;
+    }
+    
+    // Fallback: utiliser le login
+    const login = this.getUserLogin();
+    if (login) {
+      return login;
+    }
+    
+    return 'Utilisateur';
+  }
+
+  /**
+   * Récupère les initiales de l'utilisateur
+   * @returns Les initiales (ex: "MD" pour Marie Dupont)
+   */
+  getUserInitials(): string {
+    const prenom = this.getUserPrenom();
+    const nom = this.getUserNom();
+    
+    let initials = '';
+    if (prenom) initials += prenom.charAt(0).toUpperCase();
+    if (nom) initials += nom.charAt(0).toUpperCase();
+    
+    if (initials) {
+      return initials;
+    }
+    
+    // Fallback: utiliser la première lettre du login
+    const login = this.getUserLogin();
+    if (login) {
+      return login.charAt(0).toUpperCase();
+    }
+    
+    return 'U';
+  }
+
+  /**
+   * Récupère le label du rôle en français
+   * @returns Le label du rôle
+   */
+  getRoleLabel(): string {
+    const role = this.getUserRole();
+    switch (role) {
+      case 'ADMIN': return 'Administrateur';
+      case 'MEDECIN': return 'Médecin';
+      case 'SECRETARY': return 'Secrétaire';
+      default: return 'Utilisateur';
+    }
+  }
+
+  /**
    * Récupère l'ID du cabinet depuis le token JWT
    * @returns L'ID du cabinet ou null
    */

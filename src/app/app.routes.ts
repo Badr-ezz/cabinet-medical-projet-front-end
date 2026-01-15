@@ -23,7 +23,6 @@ import { AdminDashboardComponent } from './pages/admin/dashboard/dashboard.compo
 import { CabinetsComponent } from './pages/admin/cabinets/cabinets.component';
 import { UsersComponent } from './pages/admin/users/users.component';
 import { MedicationsComponent } from './pages/admin/medications/medications.component';
-import { SettingsComponent } from './pages/admin/settings/settings.component';
 
 // Guard import
 import { authGuard } from './guards/auth.guard';
@@ -70,8 +69,7 @@ export const routes: Routes = [
       { path: 'dashboard', component: AdminDashboardComponent },
       { path: 'cabinets', component: CabinetsComponent },
       { path: 'users', component: UsersComponent },
-      { path: 'medications', component: MedicationsComponent },
-      { path: 'settings', component: SettingsComponent }
+      { path: 'medications', component: MedicationsComponent }
     ]
   },
   { path: '**', redirectTo: '' }
